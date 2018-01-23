@@ -5,7 +5,7 @@ Hypervisor configuration and management tools
 
 ## To Install:
 
-  ``$ sudo curl -L https://raw.githubusercontent.com/containercraft/hypervisor/master/install.sh |bash ``
+  ``$ sudo curl -L https://raw.githubusercontent.com/containercraft/hypervisor/master/install.sh | bash ``
 
   ``$ sudo ccio-install``
 
