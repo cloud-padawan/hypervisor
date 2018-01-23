@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 ## By ContainerCraft.io (CCIO|ccio) 
 # This function will:
@@ -55,9 +55,12 @@ fi
 #################################################################################
 # Create CCIO Configuration File
 seed_ccio_filesystem () {
-lxd_SVC_NAME_CHECK=$(systemctl list-unit-files | grep -E "lxd.service|snap.lxd.daemon.service")
-ovs_SVC_NAME_CHECK=$(systemctl list-unit-files | grep -E "ovs-vswitchd.service|openvswitch-switch.service")
-libvirt_SVC_NAME_CHECK=$(systemctl list-unit-files | grep -E "libvirt.service")
+lxd_SVC_NAME_CHECK=$(systemctl list-unit-files \
+                    | grep -E "lxd.service|snap.lxd.daemon.service")
+ovs_SVC_NAME_CHECK=$(systemctl list-unit-files \
+                    | grep -E "ovs-vswitchd.service|openvswitch-switch.service")
+libvirt_SVC_NAME_CHECK=$(systemctl list-unit-files \
+                        | grep -E "libvirt.service")
 
 cat >/etc/ccio/ccio.conf <<EOF
 
@@ -89,20 +92,6 @@ EOF
 }
 
 #################################################################################
-# System upgrade routine called when required
-apt_upgrade () {
-apt upgrade -y 
-apt dist-upgrade -y 
-apt autoremove -y
-}
-
-#################################################################################
-# System update routine called when required
-apt_udpate () {
-apt update 
-}
-
-#################################################################################
 # Create ccio filesystem
 seed_ccio_filesystem () {
     echo "Seeding CCIO file system"
@@ -118,14 +107,14 @@ virt-host-validate
 
 #################################################################################
 # install Libvirt | KVM | QEMU packages
-libvirt_install () {
+install_libvirt () {
 echo "[f25.0s] Installing Libvirt packages"
 LIBVIRT_PKGS="qemu \
               qemu-kvm \
 	          qemu-utils \
-	          libvirt0 \
 	          libvirt-bin \
 	          virtinst"
+#	          libvirt0 \
 EFI_PKGS="qemu-efi \
           ovmf"
        apt install -y $LIBVIRT_PKGS #EFI_PKGS
@@ -138,7 +127,7 @@ while true; do
    	read -p "$SEP_2 Do you want to continue installation?"
    	case $yn in
    		[Yy]* ) echo "$SEP_2 Continuing ..." ; 
-            install_LIBVIRT
+            libvirt_install
    			break
             ;;
 		[Nn]* ) echo "$SEP_2 Exiting due to user input!"
@@ -155,22 +144,60 @@ echo "[f10.0e]"
 #   (Usually enabled in BIOS on supported hardware)
 #   EG: VT-d or AMD-V 
 check_host_virt_support () {
-check_HOST_VIRT_EXT=$(egrep -c '(vmx|svm)' /proc/cpuinfo)
 echo "[f10.0b]"
+check_HOST_VIRT_EXT=$(egrep -c '(vmx|svm)' /proc/cpuinfo)
 if [ $check_HOST_VIRT_EXT != "0" ]; then
+    echo "[f10.1r]"
 	echo "$SEP_2 System passed host virtual extension support check"
-    libvirt_install
+    install_libvirt
 elif [ $check_HOST_VIRT_EXT != "0" ]; then
+    echo "[f10.2r]"
 	echo "$SEP_2 ERROR: Host did not pass virtual extension support check!"
 	echo "       $SEP_2 This means that your hardware either does not support"
 	echo "       $SEP_2 KVM acceleration (VT-d|AMD-v), or the feature has not"
 	echo "       $SEP_2 yet been enabled in BIOS."
 	echo "       $SEP_2 You may continue installation but libvirt guests will"
-	echo "       $SEP_2 only run in HVM mode. HVM guests will experience"
+	echo "       $SEP_2 only run in PVM mode. PVM guests will experience"
 	echo "       $SEP_2 significantly degrated performance as compared to"
-	echo "       $SEP_2 running with full PVM support.
+	echo "       $SEP_2 running with full HVM support.
 	     "
-    prompt_libvirt_install
+    echo "[f10.3r]"
+    prompt_install_libvirt
+echo "[f10.0e]"
+fi
+}
+
+#################################################################################
+# Confirm safety of data removal
+check_safety_zpool_delete () {
+echo "checking pre-existing zpools"
+zpool_NAME="default"
+zpool_TYPE="zfs"
+echo "[f24.0s] Preping host for LXD configuration"
+echo "[f24.1r] CCIO_Setup is about to purge any zfs pools and lxd storage"
+echo "         matching the name $zpool_NAME"
+if [ $(zpool list $zpool_NAME; echo $?) = "0" ] && \
+   [ $(zpool list $zpool_NAME; echo $?) = "0" ]; then 
+   echo "No pre-existing storage pools found matching $zpool_NAME"
+else
+    echo "$SEP_2 Showing pool information"
+    zpool list $zpool_NAME
+    lxc storage list | grep $zpool_NAME
+    while true; do
+    read -p "Are you sure $zpool_NAME is safe to erase?" yn
+        case $yn in
+            [Yy]* ) 
+                echo "Purging $zpool_NAME ...." ; 
+                break
+                ;;
+            [Nn]* ) 
+                echo "Exiting due to user input" ; 
+                exit 1
+                ;;
+            * ) 
+                echo "Please answer yes or no.";;
+    esac
+done
 fi
 }
 
@@ -178,9 +205,10 @@ fi
 # Configure LXD for first time use
 configure_lxd_daemon () {
 echo "[f24.2r] Purging conflicting configurations"
-    zpool destroy -f $ZPOOL_NAME
-    lxc storage delete $ZPOOL_NAME
-    lxc storage create $ZPOOL_NAME $ZPOOL_TYPE
+check_safety_zpool_delete 
+    zpool destroy -f $zpool_NAME
+    lxc storage delete $zpool_NAME
+    lxc storage create $zpool_NAME $zpool_TYPE
 stty -echo; read -p "Please Create a Password for your LXD Daemon: " PASSWD; echo
 stty echo
 cat <<EOF | lxd init --preseed 
@@ -211,51 +239,12 @@ profiles:
       path: /
       pool: default
       type: disk
-  devices:
-    eth0:
-      name: eth0
-      nictype: bridged
-      parent: ovs
-      type: nic
 EOF
 echo "Configured LXD successfully with preseed values"
 }
 
 #################################################################################
-# Confirm safety of data removal
-check_safety_zpool_delete () {
-zpool_NAME=default
-zpool_TYPE=zfs
-echo "[f24.0s] Preping host for LXD configuration"
-echo "[f24.1r] CCIO_Setup is about to purge any zfs pools and lxd storage"
-echo "         matching the name $zpool_NAME"
-if [ $(zpool list $zpool_NAME; echo $?) = "0" ] && \
-   [ $(zpool list $zpool_NAME; echo $?) = "0" ]; then 
-   echo "No pre-existing storage pools found matching $zpool_NAME"
-else
-    echo "$SEP_2 Showing pool information"
-    zpool list $zpool_NAME
-    lxc storage list | grep $zpool_NAME
-    while true; do
-    read -p "Are you sure $zpool_NAME is safe to erase?" yn
-        case $yn in
-            [Yy]* ) 
-                echo "Purging $zpool_NAME ...." ; 
-                break
-                ;;
-            [Nn]* ) 
-                echo "Exiting due to user input" ; 
-                exit
-                ;;
-            * ) 
-                echo "Please answer yes or no.";;
-    esac
-done
-fi
-}
-
-#################################################################################
-# Install LXD Packages
+# Install LXD Packages from PPA
 install_lxd_legacy_ppa () {
 echo "[f23.0s] Installing LXD from PPA"
     apt-add-repository ppa:ubuntu-lxc/stable -y
@@ -270,29 +259,35 @@ echo "[f23.0s] Installing LXD from PPA"
 		uidmap \
 		criu \
 		zfsutils-linux \
+		squashfuse \
 		ebtables
 echo "$SEP_2 Installed LXD requirements successfully!"  
-check_safety_zpool_delete 
 }
 
 #################################################################################
+# Install LXD Packages from SNAP
 install_lxd_snap () {
-    apt install -y zfsutils-linux
+    apt install -y zfsutils-linux squashfuse
     snap install lxd
-check_safety_zpool_delete 
 }
 
 #################################################################################
+# Prompt for lxd install source from either Legacy PPA or SNAP package
 check_install_source_lxd () {
+echo "Do you want to install from the SNAP package or legacy PPA? "
+echo "\
+    Please note that the SNAP package is recommended while the PPA install \
+    source is required for the CRIU live migration feature
+    "
 while true; do
-   	read -p "$SEP_2 Do you want to install from the SNAP package or legacy PPA? [Legacy\Snap]"
+   	read -p "[Ll]egacy|[Ss]nap "
    	case $ls in
    		[Ll]* ) echo "Installing LXD via Legacy PPA ..." ; 
-            install_lxd_snap 
+            install_lxd_legacy_ppa
    			break
             ;;
 		[Ss]* ) echo "Installing LXD via SNAP package"
-            install_lxd_legacy_ppa
+            install_lxd_snap 
             break
             ;;
    		* ) echo "$SEP_2 Please answer Legacy or Snap." ;;
@@ -301,14 +296,16 @@ done
 }
 
 #################################################################################
-configure_openvswitch () {
 # configure system for OVS
 # If supported & user approves, enable dpdk
+configure_openvswitch () {
 echo "[f22.0s] Configuring Host for OpenVSwitch with DPDK Enablement"
 echo "[f22.1r]"
-	update-alternatives --set ovs-vswitchd /usr/lib/openvswitch-switch-dpdk/ovs-vswitchd-dpdk
+	update-alternatives --set \
+        ovs-vswitchd /usr/lib/openvswitch-switch-dpdk/ovs-vswitchd-dpdk
 echo "[f22.2r]"
 	systemctl restart openvswitch-switch.service
+	systemctl enable openvswitch-switch.service
 echo "$SEP_2 Done"
 }
 
@@ -318,7 +315,7 @@ install_openvswitch () {
 echo "[f21.0s] Installing OpenVSwitch Components"
 OVS_PKGS="openvswitch-common \
           openvswitch-switch"
-OVS_DPDK_PKGS="dkms 
+OVS_DPDK_PKGS="dkms \
                dpdk \
 	       dpdk-dev \
            openvswitch-switch-dpdk"
@@ -327,27 +324,50 @@ OVS_DPDK_PKGS="dkms
 }
 
 #################################################################################
+# System upgrade routine called when required
+apt_upgrade () {
+apt upgrade -y 
+apt dist-upgrade -y 
+apt autoremove -y
+}
+
+#################################################################################
+# System update routine called when required
+apt_udpate () {
+apt update 
+}
+
+#################################################################################
 # Check if services are installed & launch installers if required
 cmd_parse_run () {
-check_OVS_IS_INSTALLED=$( ovs-vsctl --version; echo $? ) 
-check_LIBVIRT_IS_INSTALLED=$( libvirtd --version; echo $? ) 
-check_LXD_IS_INSTALLED=$( lxd --version; echo $? )
+check_OVS_IS_INSTALLED=$(command -v ovs-vsctl >/dev/null; echo $?) 
+check_LIBVIRT_IS_INSTALLED=$(command -v libvirtd >/dev/null; echo $? ) 
+check_LXD_IS_INSTALLED=$(command -v lxd >/dev/null; echo $? )
 
+echo "running updates ..."
 apt_udpate
 apt_upgrade
 
+echo "is ovs installed, .... checking"
+echo "$check_OVS_IS_INSTALLED"
 if [ $check_OVS_IS_INSTALLED != "0" ]; then
+    echo "installing openvswitch"
     install_openvswitch
+    echo "configuring openvswitch"
     configure_openvswitch 
 fi
+echo "is lxd installed, .... checking"
 if [ $check_LXD_IS_INSTALLED != "0" ]; then
+    echo "installing lxd"
     check_install_source_lxd 
-    check_safety_zpool_delete 
+    echo "configuring lxd"
     configure_lxd_daemon 
 fi
+echo "is libvirt installed, .... checking"
 if [ $check_LIBVIRT_IS_INSTALLED != "0" ]; then
+    echo "installing libvirt+qemu+kvm"
     check_host_virt_support
-    confirm_libvirt_install
+    configure_libvirt 
 fi
 if [ $check_LIBVIRT_IS_INSTALLED = "0" ] && \
    [ $check_LXD_IS_INSTALLED = "0" ]     && \
