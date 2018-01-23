@@ -25,10 +25,7 @@
 # Add logging function
 # Add support for LXD+MAAS Integration
 # - https://github.com/lxc/lxd/blob/master/doc/containers.md (MAAS Integration)
-# Add support for LXD Snap "lxc/lxd.lxc commands"
-# - this feature should be partially enabled in the 'check_service_names'
-# - function which should switch the lxc/lxd.lxc command variable triggering
-# - 'lxd_SET_PROFILE' and 'lxd_SET_CONFIG' command to operate off that value   
+# Add support for LXD Snap "lxc/lxd.lxc commands" = Should be complete
 # Add GRE IFACE Configuration as optional function
 # Add Better Error handling & Detection
 # Add "--del-port" function
@@ -53,60 +50,93 @@
 # 
 # - script_VARIABLES (In order of execution top to bottom)
 # 
-# obb_VERSION
+# add_LXD_PORT
+# build_OVS_PORT
 # dbg_FLAG
+# dead_SERVICE_NAME
+# delete_NETWORK
+# show_HELP
 # show_HELP_SHORT 
 # show_HELP_LONG
 # show_CONFIG
 # show_HEALTH
-# remove_PORT
-# delete_NETWORK
-# add_OVS_PORT
-# add_LXD_PORT
-# lxd_NAME_LIST
-# lxd_CONT_NAME 
-# lxd_CONT_IS_REAL
-# lxd_SERVICE_NAME
-# lxd_SERVICE_STATUS
-# ovs_NAME_LIST
-# ovs_SERVICE_NAME
-# ovs_SERVICE_STATUS
+# key_lxd_IFACE_NAME
+# key_lxd_IFACE_HWADDR
+# key_lxd_IFACE_HOST_NAME
+# key_lxd_SET
 # libvirt_NAME_LIST
 # libvirt_SERVICE_NAME
 # libvirt_SERVICE_STATUS
-#
+# lxd_CMD
+# lxd_NAME_LIST
+# lxd_CONT_NAME 
+# lxd_NEW_KEY_VAL
+# lxd_CONT_IS_REAL
+# lxd_PROFILE_NAME 
+# lxd_SERVICE_NAME
+# lxd_SERVICE_STATUS
+# obb_VERSION
+# ovs_NAME_LIST
+# ovs_BR_NAME
+# ovs_BR_DRIVER
+# ovs_ADD_PORT 
+# ovs_BR_IS_REAL 
+# ovs_SERVICE_NAME
+# ovs_SERVICE_STATUS
+# ovs_IFACE_IS_UNIQUE 
+# port_IFACE_HWADDR
+# remove_PORT
+# 
 # - script_functions
 # 
+# add_lxd_port 
+# add_ovs_port
+# build_bridge_lxd
+# build_bridge_virsh
+# bridge_build  
+# check_defaults
+# config_lxd
 # cmd_parse_run      
-# show_config 
+# check_vars_obb
+# config_auto_up
+# config_libvirt
+# config_libvirt
+# check_services_is_enabled
+# check_service_health
+# delete_bridge_network
+# delete_network_bridge
+# end_build 
+# lxd_set_config
+# lxd_set_profile
+# lxc_config_set
+# lxc_profile_set 
+# lxc_network_set 
+# lxd_cont_check_if_exists
+# ovs_br_check_if_exists 
+# ovs_iface_check_if_exists
+# print_config 
+# port_hwaddr_gen
 # print_help_short
 # print_help_long
 # print_dbg_flags
-# check_service_health
-# add_lxd_port 
-# add_ovs_port
-# lxd_cont_check_if_exists
-# delete_network_bridge
+# rerun_at_function
+# remove_network_port
+# set_vars_lxd
+# set_lxd_defaults
+# start_system_service 
 # show_host_configuration
-# bridge_build  
-# end_build 
+# virt_services_is_enabled
 
 # Check if run as root!
 if [[ "$EUID" -ne "0" ]]; then
-	echo "ERROR: Must be run with root/sudo priviledges!" 
+	echo "ERROR: Must be run as root priviledges!" 
 	echo "Exiting!"
 	exit 1
 fi
       
-# Set Output Formatting Variables:
-SEP_1="------------------------------------------------------------------+"
-SEP_2="       |"
-SEP_3="       +"
-
 # Set Bridge-Builder Variables 
 # Used unless otherwise set by flags at run-time
-echo "[o00.0b]$SEP_1"
-echo "$SEP_2 Setting Default Variables"
+echo "[o00.0b] Setting Default Variables"
 OBB_VERSION=v00.87.a
 # Check for pre-determined system values
 # If present, will set value for the `CONF_FILE` variable.
@@ -114,58 +144,15 @@ OBB_VERSION=v00.87.a
 if [ -f /etc/ccio/ccio.conf ]; then
     echo "$SEP_2 Detected ccio.conf, loading configuration ..."
     source /etc/ccio/ccio.conf
-    if [ $CONF_FILE = true ]; then
-        echo "$SEP_2 ccio.conf Enabled"
+    if [ $conf_FILE_VARS = true ]; then
+        echo "Found ccio.conf"
+        echo "ccio.conf Enabled"
     fi
-#   # Need to add conf file creation routine
-#   if [ ! -f /etc/ccio/ccio.conf]; then
-#       echo ""
-#   fi
+    if [ ! -f /etc/ccio/ccio.conf]; then
+        echo "CCIO environment not found"
+        option_INSTALL_CCIO_ENV="true"
+    fi
 fi
-
-# Determine Distribution and Package Specific System Service Names
-check_service_names () {
-# List 
-lxd_NAME_LIST="\
-lxd.service|\
-snap.lxd.daemon.service"
-ovs_NAME_LIST="\
-ovs-vswitchd.service|\
-openvswitch-switch.service"
-libvirt_NAME_LIST="\
-libvirtd.service"
-
-for svc_UNK in lxd_NAME_LIST ovs_NAME_LIST libvirt_NAME_LIST; do
-    systemctl list-unit-files \
-        | grep -E "$svc_UNK" \
-        | $svc_UNK=$(awk '{print $1}')
-done
-echo "Detected $LXD_"
-lxd_SERVICE_NAME="snap.lxd.daemon"
-ovs_SERVICE_NAME="openvswitch-switch.service"
-libvirt_SERVICE_NAME="libvirtd.service"
-}
-
-# Default Variables
-# Used unless otherwise set in ccio.conf or at command line
-# Debug & Verbosity Settings:
-print_DBG_FLAGS="true"
-dbg_BREAK="true"
-# Operating Variables
-default_NETWORK_NAME="obb"
-network_NAME="$default_NETWORK_NAME"
-tmp_FILE_STORE="/tmp/bridge-builder/"
-bridge_DRIVER="openvswitch"
-delete_NETWORK="false"
-ovs_ADD_PORT="false"
-ovs_BRIDGE_NAME="false"
-lxd_CONT_NAME="false"
-show_CONFIG="false"
-show_HEALTH="false"
-show_HELP="false"
-show_HELP_LONG="false"   
-work_DIR=$(pwd)
-running_function="false"
 
 # Read variables from command line
 echo "$SEP_2 Enabling Command Line Options"
@@ -221,7 +208,7 @@ echo "[o00.0e]$SEP_1"
 
 #################################################################################
 #Print option values
-print_vars () {
+print_switch_vars () {
 if [ $print_DBG_FLAGS = "true" ]; then
 echo "[d00.0b]$SEP_1"
 echo "       | SHOW_HELP        =  $SHOW_HELP"
@@ -241,34 +228,34 @@ fi
 #################################################################################
 # Debug output & Testing break
 print_dbg_flags () {
-if [ $print_DBG_FLAGS = "true" ]; then
+if [ $show_DBG_FLAGS = "true" ]; then
         echo "$dbg_FLAG"
 fi
 if [ $dbg_BREAK = "true" ]; then
-    print_vars
+    print_switch_vars
     exit 0
 fi
 }
 
 #################################################################################
-end_BUILD () {
 # Confirm end of setup script 
-echo "[f0e.0s]$SEP_1"
-echo "$SEP_2 $NETWORK_NAME Build complete for LXD and KVM"
-echo "[f0e.0e]$SEP_1"
+end_BUILD () {
+echo "[f0e.0r] OpenVswitch $NETWORK_NAME Build complete for LXD and KVM"
 }
 
 #################################################################################
-config_IFACE_UP () {
-cat <<EOF >>/root/iface.cfg
+# Add ifup network config file to interfaces.d
+set_iface_auto_up () {
+cat <<EOF >/etc/network/interfaces.d/iface-$ovs_BR_NAME.cfg
 
-auto $NETWORK_NAME
-iface $NETWORK_NAME inet manual
+auto $ovs_BR_NAME
+iface $ovs_BR_NAME inet manual
 EOF
 }
 
 #################################################################################
-config_AUTO_UP () {
+# Prompt for Network startup on boot
+config_auto_up () {
 if [ -f /root/iface.cfg ]; 
     then
         echo "$SEP_2 OBB can raise the $NETWORK_NAME bridge & and configure to auto up."
@@ -277,7 +264,7 @@ if [ -f /root/iface.cfg ];
             case $yn in
                 [Yy]* ) 
                       echo "Enabling OVS $NETWORK_NAME bridge on boot"; 
-                      enable_AUTO_UP="true"
+                      set_AUTO_UP="true"
                       break
                       ;;
                 [Nn]* ) 
@@ -298,274 +285,217 @@ fi
 }
 
 #################################################################################
-config_LIBVIRT () {
-# create virsh network xml & define new virsh network
-echo "[f08.0s]$SEP_1"
-echo "$SEP_2 Configuring Network Definitions for Libvirtd+KVM+QEMU"
-# Set VIRSH Working Variables
-VIRSH_XML_FILE=$NETWORK_NAME.xml 
-VIRSH_XML_PATH="/var/lib/libvirt/network-config" 
-VIRSH_XML_TARGET=$VIRSH_XML_PATH/$VIRSH_XML_FILE
+# Create VIRSH Network XML Configuration File
+write_config_network_virsh () {
 
-# Create xml file path and file
-echo "[f08.1r]$SEP_1"
-echo "$SEP_2 Creating virsh network xml configuration file"
-    mkdir -p $VIRSH_XML_PATH 
-echo "$SEP_2 Creating virsh network xml directory"
+# Set VIRSH Working Variables
+virsh_XML_FILE="$ovs_BR_NAME.xml"
+virsh_XML_TARGET="$tmp_FILE_STORE/$virsh_XML_FILE"
+
+# Create temp file storage director
+mkdir -p $tmp_FILE_STORE
 
 # Write xml configuration
-echo "[f08.2r]$SEP_1"
-echo "$SEP_2 Writing configuration: 
-$SEP_2       > $VIRSH_XML_PATH/$VIRSH_XML_FILE"
-cat >$VIRSH_XML_TARGET <<EOF
+echo "[f08.2r] Writing configuration > $virsh_XML_TARGET"
+cat >$virsh_XML_TARGET <<EOF
 <network>
-  <name>$NETWORK_NAME</name>
+  <name>$ovs_BR_NAME</name>
   <forward mode='bridge'/>
-  <bridge name='$NETWORK_NAME' />
+  <bridge name='$ovs_BR_NAME' />
   <virtualport type='openvswitch'/>
 </network>
 EOF
-echo "$SEP_2 $VIRSH_XML_FILE VIRSH XML Config Written"
 
-# Defining libvirt network $NETWORK_NAME
-echo "[f08.3r]$SEP_1"
-echo "$SEP_2 Creating virsh network from $VIRSH_XML_TARGET"
-echo "$SEP_3
- "
-    virsh net-define $VIRSH_XML_TARGET 
-echo "$SEP_3"
-echo "$SEP_2 > Defined virsh network from $VIRSH_XML_FILE"
+echo "Done Writing $virsh_XML_FILE"
+}
+
+#################################################################################
+# Write virsh network xml & define new virsh network
+build_bridge_virsh () {
+echo "Configuring Network Definitions for Libvirtd+KVM+QEMU"
+
+# Run xml creatioin function
+write_config_network_virsh
+
+# Defining libvirt network $ovs_BR_NAME
+virsh net-define $virsh_XML_TARGET 
+echo "> Defined virsh network from $virsh_XML_FILE"
 
 #Starting Libvirt network
-echo "$SEP_3"
-echo "[f08.4r] Starting virsh $NETWORK_NAME"
-echo "$SEP_3
- "
-virsh net-start $NETWORK_NAME
-# Setting network to auto-start at boot
-echo "$SEP_3"
-echo "$SEP_2 Switching virsh $NETWORK_NAME to autostart"
-echo "$SEP_3
- "
-virsh net-autostart $NETWORK_NAME
+virsh net-start $ovs_BR_NAME
 
-echo "$SEP_3"
-echo "[f08.0e] Done Configuring Libvirt $NETWORK_NAME"
+# Setting network to auto-start at boot
+virsh net-autostart $ovs_BR_NAME
+
+echo "[f08.0e] Done Configuring Libvirt $ovs_BR_NAME"
+}
+
+#################################################################################
+# Create LXD Profile matching network bridge name
+build_profile_lxd () {
+echo "[f07.1r] Building LXD Profile \"$ovs_BR_NAME\""
+$$lxd_CMD profile create $lxd_PROFILE_NAME
+$lxd_CMD profile device add $lxd_PROFILE_NAME $ovs_BR_NAME nic nictype=bridged parent=$ovs_BR_NAME
+$lxd_CMD profile device add $lxd_PROFILE_NAME root disk path=/ pool=default
 }
 
 #################################################################################
 # Create initial bridge with OVS driver & configure LXD
-config_LXD () {
-# Create network via LXD API
-echo "[f07.0s]$SEP_1"
-echo "$SEP_2 Building LXD Network \"$NETWORK_NAME\" using \"$BRIDGE_DRIVER\" driver"
-echo "$SEP_3
-"
-lxc network create $NETWORK_NAME 
-echo "
-$SEP_3"
-    echo "$SEP_2 Created LXD Network $NETWORK_NAME"
+build_network_lxd () {
+echo "[f07.1r] Building LXD Network \"$ovs_BR_NAME\" using \"$bridge_DRIVER\" driver"
 
-# Setup network driver type
-echo "[f07.1r]$SEP_1"
-lxc network set $NETWORK_NAME \
-    bridge.driver $BRIDGE_DRIVER 
-    echo "$SEP_2 Configured $NETWORK_NAME with $BRIDGE_DRIVER driver"
+# Create network 
+echo "[f07.1r]"
+$lxd_CMD network create $ovs_BR_NAME
 
-## DNS configuration Options
-# define default domain name:
-#echo "[f07.2r]$SEP_1"
-#lxc network set $NETWORK_NAME \
-#    dns.domain $DNS_DOMAIN 
-#    echo "$SEP_2 Configured $NETWORK_NAME with default domain name: $DNS_DOMAIN"  
-# define dns mode = set via hostname
-#lxc network set $NETWORK_NAME \
-#    dns.mode dynamic         
-
-echo "[f07.3r] Disabling LXD IP Configuration"
-# Set ipv4 address on bridge
-lxc network set $NETWORK_NAME \
-    ipv4.address none        
-# Set ipv6 address on bridge
-lxc network set $NETWORK_NAME \
-    ipv6.address none        
-
-# Configure ipv4 & ipv6 address on bridge [true/false]
-#echo "[f07.4r] Disabling Bridge Address"
-# configure ipv4 nat setting
-#lxc network set $NETWORK_NAME \
-#    ipv4.nat $NATv4          
-#    echo "$SEP_2 Switching ipv4 nat to $NATv4"
-# configure ipv4 nat setting
-#lxc network set $NETWORK_NAME \
-#    ipv6.nat $NATv6          
-#    echo "$SEP_2 Switching ipv6 nat to $NATv6"
-
-# Configure routing on bridge [enable/disable]
-echo "[f07.5r] Disabling Bridge Routing function"
-# set ipv4 routing
-#lxc network set $NETWORK_NAME \
-#    ipv4.routing $ROUTEv4    
-#    echo "$SEP_2 Switching ipv4 routing to $DHCPv4"
-# Set ipv6 routing
-#lxc network set $NETWORK_NAME \
-#    ipv6.routing $ROUTEv6    
-#    echo "$SEP_2 Switching ipv6 routing to $DHCPv6"
-
-# configure dhcp on bridge 
-# options: true false
-echo "[f07.6r] Disabling LXD DHCP Function"
-# set ipv4 dhcp
-lxc network set $NETWORK_NAME \
-    ipv4.dhcp $DHCPv4        
-# set ipv6 dhcp
-lxc network set $NETWORK_NAME \
-    ipv6.dhcp $DHCPv6        
-
-# Bridge nat+router+firewall settings
-echo "[f07.7r] Disabling LXD NAT+Firewall Function"
-# disable ipv4 firewall 
-lxc network set $NETWORK_NAME \
-    ipv4.firewall false      
-# disable ipv6 firewall
-lxc network set $NETWORK_NAME \
-    ipv6.firewall false      
-
-# Create associated lxd profile with default ethernet device name and storage
-# path
-echo "[f07.8r] Creating LXD Profile for $NETWORK_NAME"
-echo "$SEP_3
-"
-lxc profile create $LXD_PROFILE
-lxc profile device add $NETWORK_NAME $LXD_PROFILE \
-    nic nictype=bridged parent=$NETWORK_NAME
-lxc profile device add $LXD_PROFILE \
-    root disk path=/ pool=default
-echo "
-$SEP_3"
-echo "[f07.0e] LXD Network \"$NETWORK_NAME\" Configuration Complete"
+# Set LXD Network Keys
+echo "[f07.1r]"
+for key_lxd_SET in $key_lxd_NETWORK_SET; do
+    lxc_network_set
+done
 }
 
 #################################################################################
-check_DEFAULTS () {
-echo "[f06.0s]$SEP_1"
-echo "[f06.1r] Validating All LXD Configuration Variables"
-DEFAULT_CHECK_CONFIRM="$SEP_2 > Are you sure you want to continue building the $NETWORK_NAME bridge?  "
-if [ $NETWORK_NAME == $DEFAULT_NETWORK_NAME ]
-    then
-        echo "[f06.2r] WARN: Bridge Builder run with default value for OVS network configuration!"
+# Check for user confirmation if running with default ovs-bridge name
+check_vars_obb () {
+echo "[f06.1r] Validating OVS Bridge Name ... "
+check_DEFAULT_CONFIRM_1=" > A Name has not been declared for the OVS Bridge, using default values ... " 
+check_DEFAULT_CONFIRM_2=" > Are you sure you want to continue building the $ovs_BR_NAME bridge?  "
+if [ $ovs_BR_NAME == $default_BR_NAME ]; then
+        echo "$check_DEFAULT_CONFIRM_1"
         while true; do
-            read -p "$SEP_2 $DEFAULT_CHECK_CONFIRM" yn
+            read -p " > $check_DEFAULT_CONFIRM_2" yn
             case $yn in
-                [Yy]* ) echo "Continuing ...." ; break;;
+                [Yy]* ) echo "Continuing ...."; 
+                      break
+                      ;;
                 [Nn]* ) 
-                      echo "$SEP_2 $SEP_2 > ERROR: Canceling due to user input!"
+                      echo " > ERROR: Canceling due to user input!"
                       exit
                       ;;
-                * ) echo "Please answer yes or no.";;
+                * ) echo " > Please answer yes or no.";;
             esac
     done
     else 
         echo "[f06.3r]----------------------------------------------------------"
-        echo "       | Preparing to configure $NETWORK_NAME"
+        echo "       | Preparing to configure $ovs_BR_NAME"
 fi
 echo "[f06.0e]$SEP_1"
 }
 
 #################################################################################
-set_LXD_DEFAULTS () {
-# Define default DNS domain assignment
-echo "[f05.0s]$SEP_1"
-echo "$SEP_2 Setting additional LXD Network and Profile Build Variables"
-
-#DNS_DOMAIN="braincraft.io" 
-#echo "Setting Default Domain Name to $DNS_DOMAIN"
-
-# Set Working Dir for temp files such as network .xml definitions for KVM+QEMU
-IFACE_CFG_DIR="/root/network/"
-# Set LXD Profile name to match network name
-LXD_PROFILE=$NETWORK_NAME
-
-# Configure default LXD container interface name
-LXD_ETHERNET="eth0"
+# Define default lxd provisioning variables
+set_vars_lxd () {
+echo "[f05.0r] Setting additional LXD Network and Profile Build Variables"
 
 # Configure DHCP function
-# Valid options "true|false"
-DHCPv4="false"
-DHCPv6="false"
+v4_DHCP="false"
+v6_DHCP="false"
 
-# Configure Routing function
-# Valid Options "true|false" 
-ROUTEv4="false"
-ROUTEv6="false"
-echo "[f05.0e]$SEP_1"
+# Configure Routing/NAT'ing function - Valid Options "true|false" 
+v4_ROUTE="false"
+v6_ROUTE="false"
+
+# Define Network Key Values
+key_lxd_NETWORK_SET="key_lxd_BR_DRIVER='bridge.driver $ovs_BR_DRIVER' \
+                     key_lxd_v4_ADDR='key_lxd_ipv4.address none'      \
+                     key_lxd_v6_ADDR='key_lxd_ipv6.address none'      \
+                     key_lxd_v4_FW='ipv4.firewall $v4_ROUTE'          \
+                     key_lxd_v6_FW='ipv6.firewall $v6_ROUTE'          \
+                     key_lxd_v4_NAT='ipv4.nat $v4_ROUTE'              \
+                     key_lxd_v6_NAT='ipv6.nat $v6_ROUTE'              \
+                     key_lxd_v4_ROUTING='ipv4.routing $v4_ROUTE'      \ 
+                     key_lxd_v6_ROUTING='ipv6.routing $v6_ROUTE'      \ 
+                     key_lxd_v4_DHCP='ipv4.dhcp $v4_DHCP'             \ 
+                     key_lxd_v6_DHCP='ipv6.dhcp $v6_DHCP'             "
+echo "[f05.0r]"
+
+lxd_PROFILE_NAME="$ovs_BR_NAME"
 }
 
 #################################################################################
-BUILD () {
 # Core Bridge Builder Feature
 # This function calls the child functions which build the bridge and configure
 # client services such as LXD and KVM+QEMU (virsh) for use with OVS
-echo "[f04.0s]$SEP_1"
-echo "[f04.1r] > Checking System Readiness"
-virt_services_is_enabled
-echo "[f04.2r]$SEP_2 > Setting LXD Default Variables"
-set_LXD_DEFAULTS
-echo "[f04.3r]$SEP_2 > Checking LXD Variables"
-check_DEFAULTS
-echo "[f04.4r]$SEP_2 > purging any pre-existing $NETWORK_NAME configuration"
-purge_NETWORK
-echo "[f04.5r]$SEP_2 > Starting LXD Configuration"
-config_LXD
-echo "[f04.6r]$SEP_2 > Starting LIBVIRT Configuration"
-config_LIBVIRT
-echo "[f04.7r]$SEP_2 > Running Auto-Up Option"
-config_AUTO_UP
-
-show_CONFIG
-echo "[f04.0s]$SEP_1"
+bridge_build () {
+rerun_at_function="bridge_build"
+echo "[f04.1r]> Checking System Readiness"
+check_services_is_enabled
+echo "[f04.2r]> Setting LXD Default Variables"
+set_vars_lxd
+echo "[f04.3r]> Checking Variables"
+check_vars_obb
+echo "[f04.4r]> Purging pre-existing $ovs_BR_NAME configuration"
+delete_bridge_network
+echo "[f04.5r]> Starting LXD Configuration"
+build_bridge_lxd
+echo "[f04.6r]> Starting LIBVIRT Configuration"
+build_bridge_virsh
+echo "[f04.0s]>"
+print_config
 }
 
 #################################################################################
-# Needs Work to integrate
-lxd_set_profile () {
-    echo "doing something"
+# Set LXD Network Key Values
+lxc_network_set () {
+    $lxd_CMD network set $ovs_BR_NAME $key_lxd_SET
+    echo "Set LXD Network \"$ovs_BR_NAME\" key to \"$key_lxd_SET\""
 }
 
 #################################################################################
-lxd_set_config () {
-    lxc config set $lxd_CONTAINER_NAME $lxd_NEW_KEY_VAL
-    echo "Set $lxd_CONTAINER_NAME $lxe_NEW_KEY_VAL"
+# Set LXD Profile Key Values
+lxc_profile_set () {
+    $lxd_CMD profile set $lxd_PROFILE_NAME $key_lxd_SET
+    echo "Set LXD Profile \"$lxd_PROFILE_NAME\" key to \"$key_lxd_SET\""
 }
 
 #################################################################################
+# Set LXD Container Key Values
+lxc_container_set () {
+    $lxd_CMD config set $lxd_CONT_NAME $key_lxd_SET
+    echo "Set LXD Container \"$lxd_CONT_NAME\" key to \"$lxd_NEW_KEY_VAL\""
+}
+
+#################################################################################
+# Set LXD Daemon Key Values
+lxc_container_set () {
+    $lxd_CMD config set $key_lxd_SET
+    echo "Set LXD Daemon key to \"$lxd_NEW_KEY_VAL\""
+}
+
+#################################################################################
+# Check if interface name is already configured
 ovs_iface_check_if_exists () {
 for br in $(ovs-vsctl list-br); do 
     ovs-vsctl list-ports $br | grep $ovs_ADD_PORT 
     ovs_IFACE_IS_UNIQUE="$?"
     if [ $ovs_IFACE_IS_UNIQUE = "0" ]; then 
         echo "WARN: Found $ovs_ADD_PORT port on the $br OVS Bridge."
+    elif [ $ovs_IFACE_IS_UNIQUE != "0" ]; then 
+        echo "Port Name $ovs_ADD_PORT does not appear to be in use."
     fi
 done
-if [ $ovs_IFACE_IS_UNIQUE != "0" ]; then 
-    echo "Port Name $ovs_ADD_PORT does not appear to be in use."
-fi
 }
 
 
 #################################################################################
+# Check if lxd container name exists on host
 lxd_cont_check_if_exists () {
-    lxc list --format=csv -c n | grep $lxd_CONT_NAME ;
+    $lxd_CMD list --format=csv -c n | grep $lxd_CONT_NAME ;
     lxd_CONT_IS_REAL="$?"
 }
 
 #################################################################################
+# Check if bridge name exists on host 
 ovs_br_check_if_exists () {
     ovs-vsctl list-br | grep $ovs_BRIDGE_NAME
     ovs_BR_IS_REAL="$?"
 }
 
 #################################################################################
+# Generate unique hardware mac address for interface
+# Uses container name, bridge name, and interface name as unique md5sum input
+# Will be globally unique while also being repeatable if required
 port_hwaddr_gen () {
 combined_HASH_INPUT="$ovs_BRIDGE_NAME$lxd_CONTAINER_NAME$port_IFACE_NAME"
 port_IFACE_HWADDR=$( \
@@ -588,7 +518,7 @@ port_IFACE_HWADDR=$( \
 # - Attach new port to container specified
 # - Attach new port to OVS Bridge specified
 # - Set LXD container property to make interface name persistent
-add_OVS_PORT () {
+add_ovs_port () {
 echo "[f09.1r]"
 if [ $lxd_CONT_NAME != "false" ]; then
     
@@ -596,7 +526,7 @@ if [ $lxd_CONT_NAME != "false" ]; then
     # fail if bridge does not exist
     echo "Checking for variable sanity"
     ovs_br_check_if_exists
-    if [ $ovs_BR_IS_REAL = 0 ]; then
+    if [ $ovs_BR_IS_REAL = "0" ]; then
         echo "$SEP_2 Found $ovs_BR_NAME" 
     else
         echo "$SEP_2 Found the following bridge names:"
@@ -609,12 +539,12 @@ if [ $lxd_CONT_NAME != "false" ]; then
     # Check if container name exists
     # Fail if container name does not exist
     lxd_cont_check_if_exists
-    if [ $lxd_CONT_IS_REAL = 0 ]; then
+    if [ $lxd_CONT_IS_REAL = "0" ]; then
         echo "$SEP_2 Found $lxd_CONT_NAME" 
     else
         echo "$SEP_2 Available Containers:
         "
-        lxc list --format=csv -c n
+        $lxd_CMD list --format=csv -c n
         echo ""
         echo "$SEP_2 Aborting port configuration due to error!"
         echo "$SEP_2 ERROR: Container Not Found!"
@@ -624,45 +554,41 @@ if [ $lxd_CONT_NAME != "false" ]; then
     # check if port name already exists
     # fail if a port matching this name already exists
     ovs_iface_check_if_exists
-    if [ $ovs_IFACE_IS_UNIQUE != 0 ]; then
+    if [ $ovs_IFACE_IS_UNIQUE != "0" ]; then
         echo "$SEP_2 Confirmed Port Name $ovs_ADD_PORT is useable "
     fi
-    if [ $ovs_IFACE_IS_UNIQUE = 0 ]; then
+    if [ $ovs_IFACE_IS_UNIQUE = "0" ]; then
         echo "$SEP_2 Aborting port configuration due to error!"
         echo "$SEP_2 ERROR: Interface Name $ovs_ADD_PORT already in use!"
         exit 1
     fi
 
 # Generate unique hardware mac address for interface
-# Uses container name, bridge name, and interface name as unique md5sum
-# input
-# Will be unique to this networkm cintaunerm and unterface name while being
-# repeatable if required
 port_hwaddr_gen
 
 # Generate lxd container key values
-# IFACE_NAME sets the name of the device in the lxd configuration file
-# IFACE_HOST_NAME creates a persistent ovs bridge device name
-# IFACE_HWADDR uses the port_HWADDR_GEN value to set a static and repeatable mac
+# ~IFACE_NAME sets the name of the device in the lxd configuration file
+# ~IFACE_HOST_NAME creates a persistent ovs bridge device name
+# ~IFACE_HWADDR uses the port_HWADDR_GEN value to set a static and repeatable mac
 key_lxd_IFACE_NAME="volatile.$ovs_ADD_PORT.name $ovs_ADD_PORT"
 key_lxd_IFACE_HOST_NAME="volatile.$ovs_ADD_PORT.host_name $ovs_ADD_PORT"
 key_lxd_IFACE_HWADDR="volatile.$ovs_ADD_PORT.hwaddr $port_IFACE_HWADDR"
 
     # Create interface and attach to LXD
     # Set key values for IFACE_NAME, IFACE_HOST_NAME, and IFACE_HWADDR
-    echo "Attaching LXD Container $LXD_CONT_NAME to:" 
-    echo "          OVS Bridge:   $OVS_BRIDGE_NAME"
-    echo "          On Port:      $OVS_ADD_PORT"
-    if [ $ovs_BR_IS_REAL = 0 ] && \
-       [ $lxd_CONT_IS_REAL = 0 ] && \
-       [ $ovs_IFACE_IS_UNIQUE != 0 ]; then
-            lxc network attach $ovs_BRIDGE_NAME $lxd_CONTAINER_NAME $ovs_ADD_PORT
+    echo "Attaching LXD Container $lxd_CONT_NAME to:" 
+    echo "          OVS Bridge:   $ovs_BRIDGE_NAME"
+    echo "          On Port:      $ovs_ADD_PORT"
+    if [ $ovs_BR_IS_REAL = "0" ] && \
+       [ $lxd_CONT_IS_REAL = "0" ] && \
+       [ $ovs_IFACE_IS_UNIQUE != "0" ]; then
+            $lxd_CMD network attach $ovs_BR_NAME $lxd_CONT_NAME $ovs_ADD_PORT
         for lxd_NEW_KEY_VAL in \
             $key_lxd_IFACE_NAME \
             $key_lxd_IFACE_HOST_NAME \
             $key_lxd_IFACE_HWADDR;
         do   
-            lxd_CONFIG_SET $lxd_NEW_KEY_VAL
+            lxd_set_config
         done
     fi
 fi
@@ -674,20 +600,21 @@ echo "[f09.2r]"
 # TODO add feature to prompt for confirmation & disconnect any containers on
 #      bridbridge to gracefully avoid error out/failure
 delete_network_bridge () {
+
 # Purge networks by name ) --purge | -p
 if [ $delete_NETWORK != "false" ]; then
     ovs_BR_NAME="$delete_NETWORK"
     ovs_br_check_if_exists 
     echo "Found $ovs_BR_NAME"
-    if [ $ovs_BR_IS_REAL = 0 ]; then
+    if [ $ovs_BR_IS_REAL = "0" ]; then
 
         # Remove lxd network and profile
         echo "[f03.1r] Purging $delete_NETWORK from LXD Network and Profile configuration"
-        lxc network delete $delete_NETWORK > /dev/null 2>&1 ;
-        lxc profile delete $delete_NETWORK > /dev/null 2>&1 
+        $lxd_CMD network delete $delete_NETWORK > /dev/null 2>&1 ;
+        $lxd_CMD profile delete $delete_NETWORK > /dev/null 2>&1 
 
         # Remove virsh network configuration
-        echo "[f03.2r] Purging $PURGE_NETWORK from Libvirt Network Configuration"
+        echo "[f03.2r] Purging $delete_NETWORK from Libvirt Network Configuration"
         virsh net-undefine $delete_NETWORK > /dev/null 2>&1 ;
         virsh net-destroy $delete_NETWORK > /dev/null 2>&1 ;
 
@@ -695,10 +622,13 @@ if [ $delete_NETWORK != "false" ]; then
         echo "[f03.3r] Purging OpenVswitch Configuration"
         ovs-vsctl del-br $delete_NETWORK > /dev/null 2>&1  ;
 
+        # Remove ifup file
+        rm /etc/network/interfaces.d/iface-$ovs_BR_NAME.cfg
+
         # Confirm when done
         echo "$SEP_2 Finished Purging $delete_NETWORK from system"
 
-    elif [ $lxd_CONT_IS_REAL != 0 ]; then
+    elif [ $ovs_BR_IS_REAL != "0" ]; then
         echo "$delete_NETWORK is not configured on this system"
     fi
 fi
@@ -720,7 +650,7 @@ systemctl is-active $dead_SERVICE_NAME
 # 2. if the service cannot be enabled, print warning
 # 3. if all stopped services start successfully, attempt re-run previous
 #    function
-if [ $(systemctl is-enabled $dead_SERVICE_NAME) != "0" ]; then
+if [ $(systemctl is-enabled "$dead_SERVICE_NAME") != "0" ]; then
     systemctl enable $dead_SERVICE_NAME
     if [ $? != "0" ]; then
         echo "WARN: $dead_SERVICE_NAME is not currently enabled to start at boot"
@@ -734,7 +664,7 @@ if [ $? = 0 ]; then
     dbg_FLAG="[f3h.0o] Successfully restarted $dead_SERVICE_NAME" && print_dbg_flags; 
     dbg_FLAG="[f3h.0o] Retrying $rerun_start_function" && print_dbg_flags; 
     rerun_at_function
-    elif [ $? != 0 ]; then
+elif [ $(systemctl is-active $dead_SERVICE_NAME) != 0 ]; then
         echo "ERROR: Unable to start dead service $dead_SERVICE_NAME!"
         echo "Unrecoverable error ... Aborting!"
     exit 1
@@ -783,7 +713,7 @@ fi
 
 #################################################################################
 # Show current networks configured for OVS/LXD/KVM+QEMU ) --show | -s
-show_config () {
+print_config () {
 rerun_at_function="show_config"
 
 # Check that required services are running
@@ -803,7 +733,7 @@ if [ "$libvirt_SERVICE_STATUS" = "active" ] && \
 
     # List LXD Networks
     echo "  > LXD Network Configuration <"
-    lxc network list
+    $lxd_CMD network list
 
     # List LibVirtD Networks
     echo "  > LibVirtD Network Configuration < "
@@ -813,10 +743,11 @@ fi
 
 #################################################################################
 # Show Help menu short format ) --help | -h
-print_HELP () {
+print_help_short () {
     dbg_FLAG="[f1h.1r]" && print_dbg_flags; 
     echo "
     OpenVSwitch Bridge Builder 
+
     syntax: command [option] [value]
 
     Options:
@@ -835,16 +766,19 @@ print_HELP () {
                                         Libvirt Bridge
                                         LXD Network & Profile Name
 "
-if [ $SHOW_HELP_LONG = "false" ]; then
+if [ $show_HELP_LONG = "false" ]; then
     dbg_FLAG="[f1h.1e]" && print_dbg_flags; 
 fi
 }
 
 #################################################################################
 # Show Help menu long format ) --help | -h
-print_HELP_LONG () {
+print_help_long () {
     dbg_FLAG="[f2h.1r]" && print_dbg_flags; 
     echo "
+       Learn more or contribute at:
+           https://github.com/containercraft/hypervisor
+
        This tool will create a new OVS bridge. The OVS bridge can be used for
        connecting physical ports, lxd containers, libvirt guests, and building
        logical openvswitch vxlan overlays spanning multiple physical hosts. 
@@ -887,9 +821,61 @@ ________________/
     dbg_FLAG="[f2h.1e]" && print_dbg_flags; 
 }
 
+read_MORE () {
+    echo "
+       The CCIO build environmet provides the base build environment for local
+       virtual infrastructure development. Your system will also be configured 
+       with the DEVELOPMENT CCIO Utils Development packages into /etc/ccio/. 
+       
+       Installation will also include:
+            
+             OpenVSwitch
+             Libvirtd 
+             QEMU
+             KVM
+             LXD
+
+       Learn more and contribute at:
+           https://github.com/containercraft/hypervisor
+
+       ~~ WARNING THIS IS A DEVELOPMENT BUILD - UNDERSTAND THE MEANING OF ALPHA ~~
+    "
+option_install_ccio_run 
+}
+
+#################################################################################
+# Option Run CCIO Installer
+option_install_ccio_run () {
+inst_URL="https://raw.githubusercontent.com/containercraft/hypervisor/master/install-ccio-hypervisor.sh"
+if [ $option_INSTALL_CCIO_ENV = 'true' ]; then
+        echo "Would you like to install CCIO?" 
+        read -p "$SEP_2 Would you like to install CCIO?  " ryn
+        case $ryn in
+            [Yy]* ) 
+                  echo "Installing CCIO"; 
+                  curl $inst_URL | bash
+                  break
+                  ;;
+            [Nn]* ) 
+                  echo "Not enabling bridge autostart on boot"
+                  break
+                  ;;
+            [Rr]* ) 
+                  read_MORE
+                  break
+                  ;;
+                * ) echo "Please answer yes or no.";;
+        esac
+fi
+}
+
 #################################################################################
 # Initial function that determines behavior from command line flags
 cmd_parse_run () {
+if [ $option_INSTALL_CCIO_ENV = 'true' ]; then
+echo "CCIO Environment not detected. Cannot continue running OBB"
+    option_install_ccio_run
+fi
 if [ $show_HELP = 'true' ]; then
     dbg_FLAG="[f0h.0o]" && print_dbg_flags; 
     if [ $show_HELP_LONG = 'false' ]; then
@@ -898,16 +884,16 @@ if [ $show_HELP = 'true' ]; then
         dbg_FLAG="[f1h.0c] OVS_BridgeBuilder_VERSION = $obb_VERSION" && print_dbg_flags; 
     exit 0
     elif [ $show_HELP_LONG = 'true' ]; then
-        dbg_FLAG="[f2h.0r]" && print_dbg_flags; 
+        dbg_FLAG="[f1h.0r]" && print_dbg_flags; 
         print_help_short
         print_help_long
-        dbg_FLAG="[f2h.0c] OVS_BridgeBuilder_VERSION = $obb_VERSION" && print_dbg_flags; 
+        dbg_FLAG="[f1h.0c] OVS_BridgeBuilder_VERSION = $obb_VERSION" && print_dbg_flags; 
     exit 0
     fi
 fi
 if [ $show_CONFIG != 'false' ]; then
         dbg_FLAG="[f3h.0o]" && print_dbg_flags; 
-        show_CONFIG
+        print_config
         dbg_FLAG="[f3h.0c]" && print_dbg_flags; 
     exit 0
 fi
@@ -926,7 +912,7 @@ if [ $delete_NETWORK != 'false' ]; then
 fi
 if [ $remove_PORT = 'true' ]; then
         dbg_FLAG="[f1r.0o] Purging $delete_NETWORK ..." && print_dbg_flags;
-        delete_network_bridge
+        remove_network_port
         show_host_configuration
         dbg_FLAG="[f1r.0c] Removed $ delete_NETWORK Bridge" && print_dbg_flags; 
     exit 0
@@ -941,10 +927,10 @@ if [ $build_OVS_PORT != 'false' ]; then
     elif [ $lxd_CONT_NAME != "false" ]; then
         dbg_FLAG="[f1b.2b] Creating a new bridge port for LXD" && print_dbg_flags; 
         lxd_cont_check_if_exists
-        if [ lxd_CONT_IS_REAL = 0 ]; then
-            dbg_FLAG="[f1b.3b] Adding OVS port to $lxd_CONT_NAME" && print_dbg_flags; 
+        if [ $lxd_CONT_IS_REAL = "0" ]; then
+            dbg_FLAG="[f1b.3b] Adding OVS port $build_OVS_PORT to $lxd_CONT_NAME" && print_dbg_flags; 
             add_lxd_port
-            dbg_FLAG="[f1b.3e] OVS Port created on $lxd_CONT_NAME" && print_dbg_flags; 
+            dbg_FLAG="[f1b.3e] $build_OVS_PORT Port created $lxd_CONT_NAME" && print_dbg_flags; 
         fi
         dbg_FLAG="[f1b.0c] Done Building new OVS Port" && print_dbg_flags; 
     exit 0
@@ -952,7 +938,7 @@ if [ $build_OVS_PORT != 'false' ]; then
 fi
 if    [ $build_OVS_PORT == 'false' ]  && \
       [ $delete_NETWORK == 'false' ]  && \
-#        [ $remove_PORT == 'false' ]  && \
+         [ $remove_PORT == 'false' ]  && \
          [ $show_CONFIG == 'false' ]  && \
          [ $show_HEALTH == 'false' ]  && \
            [ $show_HELP == 'false' ]; then

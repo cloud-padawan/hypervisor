@@ -12,7 +12,7 @@
 # Add ability to pass variables via yaml *(1) *(2) *(3) 
 # Add ability to turn component install on and off with flags at command line:
 # Add docker host installation either as a guest vm or natively (research required)
-# Create preseed helper tui
+# Create helper tui
 # Finish libvirt logical EFI enablement on properly equipped systems if EFI vars are detected
 # - /sys/firmware/efi/efivars
 #   Eg: $ ccio --hypervisor-install --[lxd-snap|lxd-ppa] --kvm-qemu --[openvswitch|openvswitch-dpdk] 
@@ -45,9 +45,6 @@
 #  (3) https://github.com/0k/shyaml
 #-------------------------------------------------------------------------------------------
 
-# formatting values
-SEP_2="       |"
-
 # Check if run as root!
 if [[ $EUID -ne 0 ]]; then
         echo "$SEP_2 This script must be run as root!"
@@ -55,18 +52,340 @@ if [[ $EUID -ne 0 ]]; then
         exit 1
 fi
 
-apt_UPDATE () {
-# System update sub-routine called when required
-apt update 
+#################################################################################
+# Create CCIO Configuration File
+seed_ccio_filesystem () {
+lxd_SVC_NAME_CHECK=$(systemctl list-unit-files | grep -E "lxd.service|snap.lxd.daemon.service")
+ovs_SVC_NAME_CHECK=$(systemctl list-unit-files | grep -E "ovs-vswitchd.service|openvswitch-switch.service")
+libvirt_SVC_NAME_CHECK=$(systemctl list-unit-files | grep -E "libvirt.service")
+
+cat >/etc/ccio/ccio.conf <<EOF
+
+# Default Variables
+# Used unless otherwise set in ccio.conf or at command line
+# Debug & Verbosity Settings:
+print_DBG_FLAGS="true"
+dbg_BREAK="true"
+
+# Operating Variables
+ovs_SERVICE_NAME="$ovs_SVC_NAME"
+lxd_SERVICE_NAME="$lxd_SVC_NAME_CHECK"
+libvirt_SERVICE_NAME="$libvirt_SVC_NAME_CHECK"
+default_NETWORK_NAME="obb"
+network_NAME="$default_NETWORK_NAME"
+tmp_FILE_STORE="/tmp/bridge-builder/"
+bridge_DRIVER="openvswitch"
+delete_NETWORK="false"
+ovs_ADD_PORT="false"
+ovs_BRIDGE_NAME="false"
+lxd_CONT_NAME="false"
+show_CONFIG="false"
+show_HEALTH="false"
+show_HELP="false"
+show_HELP_LONG="false"   
+running_function="false"
+
+EOF
+}
+
+#################################################################################
+# System upgrade routine called when required
+apt_upgrade () {
 apt upgrade -y 
 apt dist-upgrade -y 
 apt autoremove -y
 }
 
-configure_LIBVIRT () {
-echo "[f26.0s] Configuring host Libvirt Hypervisor"
-echo "$SEP_2 WARNING! All automated Libvirt configuration currently disabled!!!"
+#################################################################################
+# System update routine called when required
+apt_udpate () {
+apt update 
+}
+
+#################################################################################
+# Create ccio filesystem
+seed_ccio_filesystem () {
+    echo "Seeding CCIO file system"
+    mkdir -p /etc/ccio
+}
+
+#################################################################################
+# Configure and validate libvirt installation
+configure_libvirt () {
+echo "WARNING! All automated Libvirt configuration currently disabled!!!"
 virt-host-validate
+}
+
+#################################################################################
+# install Libvirt | KVM | QEMU packages
+libvirt_install () {
+echo "[f25.0s] Installing Libvirt packages"
+LIBVIRT_PKGS="qemu \
+              qemu-kvm \
+	          qemu-utils \
+	          libvirt0 \
+	          libvirt-bin \
+	          virtinst"
+EFI_PKGS="qemu-efi \
+          ovmf"
+       apt install -y $LIBVIRT_PKGS #EFI_PKGS
+echo "$SEP_2 Installed LibvirtD + KVM + QEMU Requirements!"
+}
+
+#################################################################################
+prompt_libvirt_install () {
+while true; do
+   	read -p "$SEP_2 Do you want to continue installation?"
+   	case $yn in
+   		[Yy]* ) echo "$SEP_2 Continuing ..." ; 
+            install_LIBVIRT
+   			break
+            ;;
+		[Nn]* ) echo "$SEP_2 Exiting due to user input!"
+  			exit 1
+            ;;
+   		* ) echo "$SEP_2 Please answer yes or no." ;;
+	esac
+done
+echo "[f10.0e]"
+}
+
+#################################################################################
+# Test host system for virtual extensions
+#   (Usually enabled in BIOS on supported hardware)
+#   EG: VT-d or AMD-V 
+check_host_virt_support () {
+check_HOST_VIRT_EXT=$(egrep -c '(vmx|svm)' /proc/cpuinfo)
+echo "[f10.0b]"
+if [ $check_HOST_VIRT_EXT != "0" ]; then
+	echo "$SEP_2 System passed host virtual extension support check"
+    libvirt_install
+elif [ $check_HOST_VIRT_EXT != "0" ]; then
+	echo "$SEP_2 ERROR: Host did not pass virtual extension support check!"
+	echo "       $SEP_2 This means that your hardware either does not support"
+	echo "       $SEP_2 KVM acceleration (VT-d|AMD-v), or the feature has not"
+	echo "       $SEP_2 yet been enabled in BIOS."
+	echo "       $SEP_2 You may continue installation but libvirt guests will"
+	echo "       $SEP_2 only run in HVM mode. HVM guests will experience"
+	echo "       $SEP_2 significantly degrated performance as compared to"
+	echo "       $SEP_2 running with full PVM support.
+	     "
+    prompt_libvirt_install
+fi
+}
+
+#################################################################################
+# Configure LXD for first time use
+configure_lxd_daemon () {
+echo "[f24.2r] Purging conflicting configurations"
+    zpool destroy -f $ZPOOL_NAME
+    lxc storage delete $ZPOOL_NAME
+    lxc storage create $ZPOOL_NAME $ZPOOL_TYPE
+stty -echo; read -p "Please Create a Password for your LXD Daemon: " PASSWD; echo
+stty echo
+cat <<EOF | lxd init --preseed 
+echo "[f24.3r] Configuring LXD init with preseed data"
+config:
+  core.https_address: 0.0.0.0:8443
+  core.trust_password: $PASSWD
+  images.auto_update_interval: 60
+networks:
+- name: ovs
+  type: bridge
+  config:
+    dns.mode: none
+    ipv4.nat: false
+    ipv4.dhcp: false
+    ipv4.address: none
+    ipv4.routing: false
+    ipv4.firewall: false
+    ipv6.nat: false
+    ipv6.dhcp: false
+    ipv6.address: none
+    ipv6.routing: false
+    ipv4.firewall: false
+profiles:
+- name: default
+  devices:
+    root:
+      path: /
+      pool: default
+      type: disk
+  devices:
+    eth0:
+      name: eth0
+      nictype: bridged
+      parent: ovs
+      type: nic
+EOF
+echo "Configured LXD successfully with preseed values"
+}
+
+#################################################################################
+# Confirm safety of data removal
+check_safety_zpool_delete () {
+zpool_NAME=default
+zpool_TYPE=zfs
+echo "[f24.0s] Preping host for LXD configuration"
+echo "[f24.1r] CCIO_Setup is about to purge any zfs pools and lxd storage"
+echo "         matching the name $zpool_NAME"
+if [ $(zpool list $zpool_NAME; echo $?) = "0" ] && \
+   [ $(zpool list $zpool_NAME; echo $?) = "0" ]; then 
+   echo "No pre-existing storage pools found matching $zpool_NAME"
+else
+    echo "$SEP_2 Showing pool information"
+    zpool list $zpool_NAME
+    lxc storage list | grep $zpool_NAME
+    while true; do
+    read -p "Are you sure $zpool_NAME is safe to erase?" yn
+        case $yn in
+            [Yy]* ) 
+                echo "Purging $zpool_NAME ...." ; 
+                break
+                ;;
+            [Nn]* ) 
+                echo "Exiting due to user input" ; 
+                exit
+                ;;
+            * ) 
+                echo "Please answer yes or no.";;
+    esac
+done
+fi
+}
+
+#################################################################################
+# Install LXD Packages
+install_lxd_legacy_ppa () {
+echo "[f23.0s] Installing LXD from PPA"
+    apt-add-repository ppa:ubuntu-lxc/stable -y
+	apt update
+	apt install -y -t xenial-backports \
+		lxd \
+		lxd-client \
+		lxd-tools \
+		lxc-common \
+		lxcfs \
+		liblxc1 \
+		uidmap \
+		criu \
+		zfsutils-linux \
+		ebtables
+echo "$SEP_2 Installed LXD requirements successfully!"  
+check_safety_zpool_delete 
+}
+
+#################################################################################
+install_lxd_snap () {
+    apt install -y zfsutils-linux
+    snap install lxd
+check_safety_zpool_delete 
+}
+
+#################################################################################
+check_install_source_lxd () {
+while true; do
+   	read -p "$SEP_2 Do you want to install from the SNAP package or legacy PPA? [Legacy\Snap]"
+   	case $ls in
+   		[Ll]* ) echo "Installing LXD via Legacy PPA ..." ; 
+            install_lxd_snap 
+   			break
+            ;;
+		[Ss]* ) echo "Installing LXD via SNAP package"
+            install_lxd_legacy_ppa
+            break
+            ;;
+   		* ) echo "$SEP_2 Please answer Legacy or Snap." ;;
+	esac
+done
+}
+
+#################################################################################
+configure_openvswitch () {
+# configure system for OVS
+# If supported & user approves, enable dpdk
+echo "[f22.0s] Configuring Host for OpenVSwitch with DPDK Enablement"
+echo "[f22.1r]"
+	update-alternatives --set ovs-vswitchd /usr/lib/openvswitch-switch-dpdk/ovs-vswitchd-dpdk
+echo "[f22.2r]"
+	systemctl restart openvswitch-switch.service
+echo "$SEP_2 Done"
+}
+
+#################################################################################
+# Install OpenVSwitch Packages
+install_openvswitch () {
+echo "[f21.0s] Installing OpenVSwitch Components"
+OVS_PKGS="openvswitch-common \
+          openvswitch-switch"
+OVS_DPDK_PKGS="dkms 
+               dpdk \
+	       dpdk-dev \
+           openvswitch-switch-dpdk"
+
+	apt install -y $OVS_PKGS $OVS_DPDK_PKGS
+}
+
+#################################################################################
+# Check if services are installed & launch installers if required
+cmd_parse_run () {
+check_OVS_IS_INSTALLED=$( ovs-vsctl --version; echo $? ) 
+check_LIBVIRT_IS_INSTALLED=$( libvirtd --version; echo $? ) 
+check_LXD_IS_INSTALLED=$( lxd --version; echo $? )
+
+apt_udpate
+apt_upgrade
+
+if [ $check_OVS_IS_INSTALLED != "0" ]; then
+    install_openvswitch
+    configure_openvswitch 
+fi
+if [ $check_LXD_IS_INSTALLED != "0" ]; then
+    check_install_source_lxd 
+    check_safety_zpool_delete 
+    configure_lxd_daemon 
+fi
+if [ $check_LIBVIRT_IS_INSTALLED != "0" ]; then
+    check_host_virt_support
+    confirm_libvirt_install
+fi
+if [ $check_LIBVIRT_IS_INSTALLED = "0" ] && \
+   [ $check_LXD_IS_INSTALLED = "0" ]     && \
+   [ $check_OVS_IS_INSTALLED = "0" ]; then
+   echo "All services are already installed"
+   exit 1
+fi
+}
+
+cmd_parse_run
+
+#===============================================================================#
+# Research required on scripting the following:
+# - Hugepages
+# - OVS-DPDK configuration
+#
+# DO NOT USE UNTIL FULLY TESTED!!!!!
+#(/etc/default/grub) <> 
+# GRUB_CMDLINE_LINUX_DEFAULT= \
+#    "default_hugepagesz=1G \
+#    hugepagesz=1G \
+#    hugepages=16 \
+#    hugepagesz=2M \
+#    hugepages=2048 \
+#    iommu=pt \
+#    intel_iommu=on \
+#    isolcpus=2-8,10-16,18-24,26-32"
+#(/etc/dpdk/dpdk.conf) <> NR_1G_PAGES=8
+#sudo mkdir -p /mnt/huge
+#sudo mkdir -p /mnt/huge_2mb
+#sudo mount -t hugetlbfs none /mnt/huge
+#sudo mount -t hugetlbfs none /mnt/huge_2mb -o pagesize=2MB
+#sudo mount -t hugetlbfs none /dev/hugepages
+#sudo update-grub
+#sudo reboot
+#(confirm HP config) $ grep HugePages_ /proc/meminfo cat /proc/cmdline
+#‘sudo ovs-vsctl ovs-vsctl set Open_vSwitch . <argument>’.
+#sudo ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-init=true
 # Allow running libvirt commands as user without passwd
 # gpasswd libvirtd -a <username>
 #
@@ -101,109 +420,6 @@ virt-host-validate
 # https://computingforgeeks.com/complete-installation-of-kvmqemu-and-virt-manager-on-arch-linux-and-manjaro/
 # https://wiki.archlinux.org/index.php/PCI_passthrough_via_OVMF
 # https://wiki.archlinux.org/index.php/KVM
-echo "$SEP_2 Done"
-}
-
-install_LIBVIRT () {
-# install Libvirt | KVM | QEMU packages
-echo "[f25.0s] Installing Libvirt packages"
-LIBVIRT_PKGS="qemu \
-	     qemu-kvm \
-	     qemu-utils \
-	     libvirt0 \
-	     libvirt-bin \
-	     virtinst"
-EFI_PKGS="qemu-efi \
-          ovmf"
-       apt install -y $LIBVIRT_PKGS #$EFI_PKGS
-echo "$SEP_2 Installed LibvirtD + KVM + QEMU Requirements!"
-echo "$SEP_2 Done"
-}
-
-configure_LXD () {
-# Configure LXD for first time use
-echo "[f24.0s] Preping host for LXD configuration"
-ZPOOL_NAME=default
-ZPOOL_TYPE=zfs
-echo "[f24.1r] CCIO_Setup is about to purge any zfs pools and lxd storage"
-echo "$SEP_2 matching the name $ZPOOL_NAME"
-echo "$SEP_2 Listing all matching pools between the following brackets"
-echo "       \{"
-    zpool list $ZPOOL_NAME
-    lxc storage list | grep $ZPOOL_NAME
-echo "       \}"
-while true; do
-    read -p "Are you sure $ZPOOL_NAME is safe to erase?" yn
-        case $yn in
-            [Yy]* ) 
-                echo "Continuing ...." ; 
-                break;;
-            [Nn]* ) 
-                echo "Exiting due to user input" ; 
-                exit;;
-            * ) 
-                echo "Please answer yes or no.";;
-        esac
-done
-echo "[f24.2r] Purging conflicting configurations"
-    zpool destroy -f $ZPOOL_NAME
-    lxc storage delete $ZPOOL_NAME
-    lxc storage create $ZPOOL_NAME $ZPOOL_TYPE
-echo "[f24.3r] Configuring LXD init with preseed data"
-cat <<EOF | lxd init --preseed 
-config:
-  core.https_address: 0.0.0.0:8443
-  core.trust_password: default
-  images.auto_update_interval: 60
-networks:
-- name: ovs
-  type: bridge
-  config:
-    dns.mode: none
-    ipv4.nat: false
-    ipv4.dhcp: false
-    ipv4.address: none
-    ipv4.routing: false
-    ipv4.firewall: false
-    ipv6.nat: false
-    ipv6.dhcp: false
-    ipv6.address: none
-    ipv6.routing: false
-    ipv4.firewall: false
-profiles:
-- name: default
-  devices:
-    root:
-      path: /
-      pool: default
-      type: disk
-  devices:
-    eth0:
-      name: eth0
-      nictype: bridged
-      parent: ovs
-      type: nic
-EOF
-echo "$SEP_2 Configured LXD successfully with preseed values"
-echo "Done"
-}
-
-install_LXD () {
-# Install LXD Packages
-echo "[f23.0s] Installing LXD from PPA"
-    apt-add-repository ppa:ubuntu-lxc/stable -y
-	apt update
-	apt install -y -t xenial-backports \
-		lxd \
-		lxd-client \
-		lxd-tools \
-		lxc-common \
-		lxcfs \
-		liblxc1 \
-		uidmap \
-		criu \
-		zfsutils-linux \
-		ebtables
 # sudo -i
 # groupadd --system-extrausers lxd
 # lxd --group lxd --debug
@@ -211,129 +427,3 @@ echo "[f23.0s] Installing LXD from PPA"
 # lxc remote add images images.linuxcontainers.org
 # usermod -G lxd -a <username>
 # snap install lxd (--edge) 
-echo "$SEP_2 Installed LXD requirements successfully!"	
-}
-
-configure_OPENVSWITCH () {
-# configure system for OVS
-# If supported & user approves, enable dpdk
-echo "[f22.0s] Configuring Host for OpenVSwitch with DPDK Enablement"
-echo "[f22.1r]"
-	update-alternatives --set ovs-vswitchd /usr/lib/openvswitch-switch-dpdk/ovs-vswitchd-dpdk
-echo "[f22.2r]"
-	systemctl restart openvswitch-switch.service
-echo "$SEP_2 Done"
-}
-
-install_OPENVSWITCH () {
-# Install OpenVSwitch Packages
-echo "[f21.0s] Installing OpenVSwitch Components"
-OVS_PKGS="openvswitch-common \
-          openvswitch-switch"
-OVS_DPDK_PKGS="dkms 
-               dpdk \
-	       dpdk-dev \
-               openvswitch-switch-dpdk"
-
-	apt install -y $OVS_PKGS $OVS_DPDK_PKGS
-echo "$SEP_2 Done"
-}
-
-apt_PKG_INST () {
-echo "[f20.0s] Installing Packages"
-    apt_UPDATE
-echo "$SEP_2 Starting OpenVSwitch Host Configuration ..."
-	install_OPENVSWITCH
-echo "[f21.0e] Installed OpenVSwitch requirements!"
-echo "$SEP_2 OpenVSwitch Components"
-	configure_OPENVSWITCH
-echo "[f22.0e]"
-echo "$SEP_2 Installing and configuring packages"
-	install_LXD
-echo "[f23.0e] "
-echo "$SEP_2 Configuring LXD Components"
-	configure_LXD
-echo "[f24.0e]"
-echo "$SEP_2 Installing Libvirt | KVM | QEMU Components"
-	install_LIBVIRT
-echo "[f25.0e]"
-	configure_LIBVIRT
-echo "[f26.0e]"
-echo "[f20.0e] Installed all components successfully!"
-}
-
-check_HOST_VIRT_SUPPORT () {
-# Test host system for virtual extensions
-#   (Usually enabled in BIOS on supported hardware)
-#   EG: VT-d or AMD-V 
-
-CHECK_HOST_VIRT_EXT=$(egrep -c '(vmx|svm)' /proc/cpuinfo)
-echo "[f10.0b]"
-if [ $CHECK_HOST_VIRT_EXT != "0" ]
-    then
-	echo "$SEP_2 System passed host virtual extension support check"
-else
-	echo "$SEP_2 ERROR: Host did not pass virtual extension support check!"
-	echo "       $SEP_2 This means that your hardware either does not support"
-	echo "       $SEP_2 KVM acceleration (VT-d|AMD-v), or the feature has not"
-	echo "       $SEP_2 yet been enabled in BIOS."
-	echo "       $SEP_2 You may continue installation but libvirt guests will"
-	echo "       $SEP_2 only run in HVM mode. HVM guests will experience"
-	echo "       $SEP_2 significantly degrated performance as compared to"
-	echo "       $SEP_2 running with full PVM support.
-	     "
-	while true; do
-		read -p "$SEP_2 Do you want to continue installation?"
-		case $yn in
-			[Yy]* ) echo "$SEP_2 Continuing ..." ; 
-				break;;
-			[Nn]* ) echo "$SEP_2 Exiting due to user input!"
-				exit;;
-			* ) echo "$SEP_2 Please answer yes or no." ;;
-		esac
-	done
-fi
-echo "[f10.0e]"
-}
-
-RUN () {
-echo "[f10.0o] Checking system for hardware support..."
-    check_HOST_VIRT_SUPPORT
-echo "[f10.0c]"
-echo "[f20.0o] Starting Hypervisor Installation"
-    apt_PKG_INST
-echo "[f20.0c]"
-}
-
-RUN
-
-
-
-
-#===============================================================================#
-# Research required on scripting the following:
-# - Hugepages
-# - OVS-DPDK configuration
-#
-# DO NOT USE UNTIL FULLY TESTED!!!!!
-#(/etc/default/grub) <> 
-# GRUB_CMDLINE_LINUX_DEFAULT= \
-#    "default_hugepagesz=1G \
-#    hugepagesz=1G \
-#    hugepages=16 \
-#    hugepagesz=2M \
-#    hugepages=2048 \
-#    iommu=pt \
-#    intel_iommu=on \
-#    isolcpus=2-8,10-16,18-24,26-32"
-#(/etc/dpdk/dpdk.conf) <> NR_1G_PAGES=8
-#sudo mkdir -p /mnt/huge
-#sudo mkdir -p /mnt/huge_2mb
-#sudo mount -t hugetlbfs none /mnt/huge
-#sudo mount -t hugetlbfs none /mnt/huge_2mb -o pagesize=2MB
-#sudo mount -t hugetlbfs none /dev/hugepages
-#sudo update-grub
-#sudo reboot
-#(confirm HP config) $ grep HugePages_ /proc/meminfo cat /proc/cmdline
-#‘sudo ovs-vsctl ovs-vsctl set Open_vSwitch . <argument>’.
-#sudo ovs-vsctl --no-wait set Open_vSwitch . other_config:dpdk-init=true
