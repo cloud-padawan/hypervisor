@@ -1,6 +1,11 @@
 # hypervisor
 Hypervisor installer and management tools
 
+## To Install:
+
+   `$ sudo curl -L https://github.com/containercraft/hypervisor/blob/master/install.sh | bash`
+   `$ sudo ccio-install`
+
     syntax:
        command [option] [value]
 
