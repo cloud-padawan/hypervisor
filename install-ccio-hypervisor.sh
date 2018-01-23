@@ -113,8 +113,7 @@ LIBVIRT_PKGS="qemu \
               qemu-kvm \
 	          qemu-utils \
 	          libvirt-bin \
-	          virtinst"
-#	          libvirt0 \
+	          libvirt0 "
 EFI_PKGS="qemu-efi \
           ovmf"
        apt install -y $LIBVIRT_PKGS #EFI_PKGS
@@ -247,6 +246,7 @@ echo "Configured LXD successfully with preseed values"
 # Install LXD Packages from PPA
 install_lxd_legacy_ppa () {
 echo "[f23.0s] Installing LXD from PPA"
+    apt purge lxd lxd-client
     apt-add-repository ppa:ubuntu-lxc/stable -y
 	apt update
 	apt install -y -t xenial-backports \
@@ -267,6 +267,7 @@ echo "$SEP_2 Installed LXD requirements successfully!"
 #################################################################################
 # Install LXD Packages from SNAP
 install_lxd_snap () {
+    apt purge lxd lxd-client
     apt install -y zfsutils-linux squashfuse
     snap install lxd
 }
@@ -274,24 +275,36 @@ install_lxd_snap () {
 #################################################################################
 # Prompt for lxd install source from either Legacy PPA or SNAP package
 check_install_source_lxd () {
-echo "Do you want to install from the SNAP package or legacy PPA? "
-echo "\
-    Please note that the SNAP package is recommended while the PPA install \
-    source is required for the CRIU live migration feature
-    "
-while true; do
-   	read -p "[Ll]egacy|[Ss]nap "
-   	case $ls in
-   		[Ll]* ) echo "Installing LXD via Legacy PPA ..." ; 
+PS3="
+      Please note that the SNAP package is recommended while the 
+      PPA install source is required for the CRIU live migration feature
+
+Select: "
+echo "
+      Do you want to install LXD from the SNAP package or legacy PPA? 
+
+     "
+options=("Install Snap Package" "Install Legacy PPA" "Cancel")
+select opt in "${options[@]}"; do
+    case $REPLY in
+        "1")
+            echo "Installing via snap"
+            install_lxd_snap
+            ;;
+        "2")
+            echo "Installing via legacy ppa"
             install_lxd_legacy_ppa
-   			break
             ;;
-		[Ss]* ) echo "Installing LXD via SNAP package"
-            install_lxd_snap 
-            break
+        "3")
+            echo "Canceling due to user input"
+            echo "Exiting immidiately ..."
+            exit 1
             ;;
-   		* ) echo "$SEP_2 Please answer Legacy or Snap." ;;
-	esac
+        *)
+            echo "$1 is not a valid option"
+            ;;
+    esac
+    break
 done
 }
 
@@ -342,7 +355,8 @@ apt update
 cmd_parse_run () {
 check_OVS_IS_INSTALLED=$(command -v ovs-vsctl >/dev/null; echo $?) 
 check_LIBVIRT_IS_INSTALLED=$(command -v libvirtd >/dev/null; echo $? ) 
-check_LXD_IS_INSTALLED=$(command -v lxd >/dev/null; echo $? )
+check_LXD_IS_INSTALLED="1"
+#check_LXD_IS_INSTALLED=$(command -v lxd >/dev/null; echo $? )
 
 echo "running updates ..."
 apt_udpate
