@@ -1,5 +1,7 @@
-# CCIO Hypervisor installer & OVS BridgeBuilder
----Hypervisor configuration and management tools
+CCIO Hypervisor installer & OVS BridgeBuilder
+==============================================
+
+Hypervisor configuration and management tools
 
 ## To Install:
 
@@ -7,7 +9,36 @@
 
   ``$ sudo ccio-install``
 
+## Purpose:
 
+This tooling provides a common platform to quickly and seamlessly build virtual environments.
+
+The original inspiration for this project came from endless hours of testing different virtual
+network building tools and strategies in search of a paradigm that meets a number of criteria.
+
+Easy integration of technologies including:
+  + Docker
+  + LXC / LXD
+  + Libvirt / QEMU+KVM
+  + Bare Metal Hosts
+  + Physical Switching Gear
+
+Easy end-user management and setup:
+  + Logical to comprehend
+  + Easy to setup
+  + Easy to manage
+  + Easy to use over Wifi connections
+  + Easy to integrate physical network gear
+  + Capable of multi-host overlays
+  + Capable of nesting multiple layers of networks
+
+The tooling also needs to be consistent across hardware platforms including:
+  + client laptops
+  + client desktops
+  + low cost home labs
+  + devops lab servers
+  + 100% virtual tenants
+  + multi host rack systems
 
 ##  Usage and Syntax:
        command [option] [value]
