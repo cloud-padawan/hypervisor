@@ -134,6 +134,7 @@ while true; do
             ;;
    		* ) echo "$SEP_2 Please answer yes or no." ;;
 	esac
+    break
 done
 echo "[f10.0e]"
 }
@@ -195,7 +196,8 @@ else
                 ;;
             * ) 
                 echo "Please answer yes or no.";;
-    esac
+        esac
+    break
 done
 fi
 }
