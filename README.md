@@ -1,12 +1,15 @@
-# hypervisor
-Hypervisor installer and management tools
+# CCIO Hypervisor installer & OVS BridgeBuilder
+---Hypervisor installer and management tools
 
 ## To Install:
 
-   `$ sudo curl -L https://github.com/containercraft/hypervisor/blob/master/install.sh | bash`
-   `$ sudo ccio-install`
+  ``$ sudo curl -L https://github.com/containercraft/hypervisor/blob/master/install.sh | bash ``
 
-    syntax:
+  ``$ sudo ccio-install``
+
+
+
+##  Usage and Syntax:
        command [option] [value]
 
     This tool will create a new OVS bridge.
@@ -16,7 +19,7 @@ Hypervisor installer and management tools
         \_______       
                 \_Launch a container with the "lxd profile" flag to attach
                 |    Example:                                               
-                |      lxc launch ubuntu: test-container -p $NETWORK_NAME 
+                |      lxc launch ubuntu: test-container -p $NETWORK_NAME
 
        Libvirt Guests:
         \_______
@@ -37,11 +40,11 @@ Hypervisor installer and management tools
        --show-config     -c    --    Show current networks configured locally
        --purge           -p    --    Purges network when pased with a value
                                      matching an existing network name.
-       --name            -n    --    Sets the name for building the following: 
+       --name            -n    --    Sets the name for building the following:
                                         OVS Bridge
                                         Libvirt Bridge
                                         LXD Network & Profile Name
-    
+
        |------------------------------------------------------------------+
        | OVS_BridgeBuilder_VERSION = v00.81.a
        |------------------------------------------------------------------+
