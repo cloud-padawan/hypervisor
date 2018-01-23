@@ -1,0 +1,92 @@
+diff --git a/install-ccio-hypervisor.sh b/install-ccio-hypervisor.sh
+index b3a8856..7b24dbe 100755
+--- a/install-ccio-hypervisor.sh
++++ b/install-ccio-hypervisor.sh
+@@ -1,17 +1,16 @@
+ #!/bin/bash
+ #
+-## By ContainerCraft.io (CCIO|ccio) 
+-# This function will:
++## Written By ContainerCraft.io (CCIO|ccio) 
++# This tool will:
+ # -- Install LXD from PPA
+ # -- Install Libvirt+KVM+QEMU
+ # -- Install OpenVSwitch (dpdk)
+ #
+ ## ToDo:
+-# Add option to choose LXD install from PPA or SNAP
+ # Cleanup LXD Init function to handle pre-existing zfs volumes more gracefully
+ # Add ability to pass variables via yaml *(1) *(2) *(3) 
+ # Add ability to turn component install on and off with flags at command line:
+-# Add docker host installation either as a guest vm or natively (research required)
++# Add docker installation either as a guest vm or natively (research required)
+ # Create helper tui
+ # Finish libvirt logical EFI enablement on properly equipped systems if EFI vars are detected
+ # - /sys/firmware/efi/efivars
+@@ -53,8 +52,23 @@ if [[ $EUID -ne 0 ]]; then
+ fi
+ 
+ #################################################################################
++install_obb () {
++url_OBB="https://raw.githubusercontent.com/containercraft/hypervisor/master/install-ccio-hypervisor.sh"
++
++echo "Installing OVS_Bridge_Builder"
++wget -O /etc/ccio/tools/obb.sh $url_OBB
++ln -s /etc/ccio/tools/obb.sh /usr/bin/obb
++}
++
++#################################################################################
+ # Create CCIO Configuration File
+ seed_ccio_filesystem () {
++
++# Create ccio directorys
++echo "Seeding CCIO file system ..."
++mkdir -p /etc/ccio/tools
++
++echo "Checking service names ..."
+ lxd_SVC_NAME_CHECK=$(systemctl list-unit-files \
+                     | grep -E "lxd.service|snap.lxd.daemon.service")
+ ovs_SVC_NAME_CHECK=$(systemctl list-unit-files \
+@@ -62,6 +76,7 @@ ovs_SVC_NAME_CHECK=$(systemctl list-unit-files \
+ libvirt_SVC_NAME_CHECK=$(systemctl list-unit-files \
+                         | grep -E "libvirt.service")
+ 
++echo "Writing ccio.conf ..."
+ cat >/etc/ccio/ccio.conf <<EOF
+ 
+ # Default Variables
+@@ -92,13 +107,6 @@ EOF
+ }
+ 
+ #################################################################################
+-# Create ccio filesystem
+-seed_ccio_filesystem () {
+-    echo "Seeding CCIO file system"
+-    mkdir -p /etc/ccio
+-}
+-
+-#################################################################################
+ # Configure and validate libvirt installation
+ configure_libvirt () {
+ echo "WARNING! All automated Libvirt configuration currently disabled!!!"
+@@ -383,6 +391,12 @@ if [ $check_LIBVIRT_IS_INSTALLED != "0" ]; then
+     check_host_virt_support
+     configure_libvirt 
+ fi
++if [ ! -f /etc/ccio/ccio.sh ]; then
++    seed_ccio_filesystem
++fi
++if [ ! -f /etc/ccio/tools/obb.sh ]; then
++    install_obb
++fi
+ if [ $check_LIBVIRT_IS_INSTALLED = "0" ] && \
+    [ $check_LXD_IS_INSTALLED = "0" ]     && \
+    [ $check_OVS_IS_INSTALLED = "0" ]; then
+@@ -391,6 +405,7 @@ if [ $check_LIBVIRT_IS_INSTALLED = "0" ] && \
+ fi
+ }
+ 
++
+ cmd_parse_run
+ 
+ #===============================================================================#
