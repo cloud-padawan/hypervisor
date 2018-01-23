@@ -10,13 +10,23 @@ fi
 
 #################################################################################
 install_virt_requirements () {
-source /etc/ccio/tools/install_ccio_build_env.sh
+ln -s /etc/ccio/tools/install_ccio_build_env.sh /usr/bin/ccio-install
+
+echo "
+   Thank you for downloading CCIO utils. 
+   
+   Run the following command to continue:
+      
+       $ sudo ccio-install
+       
+       "
+exit 0
 }
 
 #################################################################################
 # Download and install obb tool
 install_obb () {
-url_OBB="https://raw.githubusercontent.com/containercraft/hypervisor/master/install-ccio-hypervisor.sh"
+url_OBB="https://raw.githubusercontent.com/containercraft/hypervisor/master/ovs-bridge-builder.sh"
 
 echo "Installing OVS_Bridge_Builder"
 wget -O /etc/ccio/tools/obb.sh $url_OBB

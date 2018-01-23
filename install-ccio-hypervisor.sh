@@ -338,18 +338,13 @@ if [ $check_LIBVIRT_IS_INSTALLED != "0" ]; then
     check_host_virt_support
     configure_libvirt 
 fi
-if [ ! -f /etc/ccio/ccio.sh ]; then
-    seed_ccio_filesystem
-fi
-if [ ! -f /etc/ccio/tools/obb.sh ]; then
-    install_obb
-fi
 if [ $check_LIBVIRT_IS_INSTALLED = "0" ] && \
    [ $check_LXD_IS_INSTALLED = "0" ]     && \
    [ $check_OVS_IS_INSTALLED = "0" ]; then
    echo "All services are already installed"
    exit 1
 fi
+rm /usr/bin/ccio-install
 }
 
 
