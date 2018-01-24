@@ -306,6 +306,29 @@ apt update
 }
 
 #################################################################################
+# 
+read_MORE () {
+    echo "
+       The CCIO build environmet provides the base build environment for local
+       virtual infrastructure development. Your system will also be configured 
+       with the DEVELOPMENT CCIO Utils Development packages into /etc/ccio/. 
+       
+       Installation will also include:
+            
+             OpenVSwitch
+             Libvirtd 
+             QEMU
+             KVM
+             LXD
+
+       Learn more and contribute at:
+           https://github.com/containercraft/hypervisor
+
+       ~~ WARNING THIS IS A DEVELOPMENT BUILD - UNDERSTAND THE MEANING OF ALPHA ~~
+    "
+}
+
+#################################################################################
 # Check if services are installed & launch installers if required
 cmd_parse_run () {
 check_OVS_IS_INSTALLED=$(command -v ovs-vsctl >/dev/null; echo $?) 
