@@ -368,6 +368,7 @@ if [ $lxd_CONT_NAME != "false" ]; then
     # ~IFACE_NAME sets the name of the device in the lxd configuration file
     # ~IFACE_HOST_NAME creates a persistent ovs bridge device name
     # ~IFACE_HWADDR uses the port_HWADDR_GEN value to set a static and repeatable mac
+    # TODO Fix 372-391, keys do not pickup values
     dbg_FLAG="[f02.4r] > " && print_dbg_flags; 
     key_lxd_IFACE_NAME="volatile.$add_OVS_PORT.name $add_OVS_PORT"
     key_lxd_IFACE_HOST_NAME="volatile.$add_OVS_PORT.host_name $add_OVS_PORT"
