@@ -74,9 +74,7 @@
 # lxd_SERVICE_STATUS
 # obb_VERSION
 # ovs_NAME_LIST
-# ovs_BR_NAME
 # ovs_BR_DRIVER
-# ovs_ADD_PORT 
 # ovs_BR_IS_REAL 
 # ovs_SERVICE_NAME
 # ovs_SERVICE_STATUS
@@ -105,7 +103,6 @@
 # delete_bridge_network
 # delete_network_bridge
 # end_build 
-# lxd_set_config
 # lxd_set_profile
 # lxc_config_set
 # lxc_profile_set 
@@ -156,7 +153,7 @@ fi
 # Load Bridge-Builder Default Variables 
 # Used unless otherwise set by flags at run-time
 # Check for host ccio.conf configuration
-dbg_FLAG="[d00.0b] " && print_dbg_flags; 
+dbg_FLAG="[d00.0b] > Looking for ccio.conf " && print_dbg_flags; 
 if [ -f /etc/ccio/ccio.conf ]; then
     dbg_FLAG="[d00.0r] > Detected ccio.conf, loading configuration ..." && print_dbg_flags; 
     source /etc/ccio/ccio.conf
@@ -175,15 +172,16 @@ if [ $print_DBG_FLAGS = "true" ]; then
     To Disable Debug messages, change /etc/ccio/ccio.conf value:
         
         print_DBG_FLAGS='false'
-        
         "
 fi
 # Read variables from command line
 dbg_FLAG="[d00.2r] > Enabling Command Line Options" && print_dbg_flags; 
-OPTS=`getopt -o sHhz: --long show-config,health,help,zee: -n 'parse-options' -- "$@"`
+OPTS=`getopt \
+    -o pdsHhz: \
+    --long add-port,del-br,purge-ports,show-config,show-health,help,zee: \
+    -n 'parse-options' -- "$@"`
 
 # Fail if options are not sane
-
 dbg_FLAG="[d00.3r] > Checking Command Line Option Sanity" && print_dbg_flags; 
 if [ $? != 0 ] ; 
     then echo " > Failed parsing options ... Exiting!" >&2 ; 
@@ -199,7 +197,6 @@ while true; do
     case "$1" in
         -h                ) 
            show_HELP="true"; 
-           show_HELP_LONG="false"; 
            shift 
            ;;
              --help       ) 
@@ -207,28 +204,32 @@ while true; do
            show_HELP_LONG="true"; 
            shift 
            ;;
-       -H | --health     ) 
+       -H | --show-health ) 
            show_HEALTH=true ; 
            shift 
            ;;
-       -s | --show-config) 
+       -s | --show-config ) 
            show_CONFIG=true ; 
            shift
            ;;
-#       -b | --add-bridge ) NETWORK_NAME="$3"; shift; shift ;;
-#       -d | --delbr      ) 
-#            PURGE_NETWORK="$3"; 
-#             shift; 
-#            shift 
-#            ;;
-#       -p | --port-add   ) 
-#           OVS_BRIDGE_NAME="$3"
-#           OVS_ADD_PORT="$4" 
-#           LXD_CONT_NAME="$5"; 
-#           shift 
-#           shift 
-#           ;;
+       --purge-ports      ) 
+           purge_DEAD_OVS_PORTS="true"; 
+           shift 
+           ;;
+       -d | --del-br      )
+           delete_NETWORK="$3"; 
+           shift; 
+           shift 
+           ;;
+        -p | --port-add   ) 
+            name_OVS_BR="$3"
+            lxd_CONT_NAME="$4"; 
+            add_OVS_PORT="$5" 
+            shift 
+            shift 
+            ;;
 #            --del-port   ) PURGE_PORT="$3"; shift; shift ;;
+#       -b | --add-bridge ) NETWORK_NAME="$3"; shift; shift ;;
         -- ) shift; break ;;
         * ) break ;;
     esac
@@ -244,11 +245,12 @@ echo "       | | show_HELP        =  $show_HELP"
 echo "       | | show_HELP_LONG   =  $show_HELP_LONG"
 echo "       | | show_CONFIG      =  $show_CONFIG"
 echo "       | | show_HEALTH      =  $show_HEALTH"
+echo "       | | orphan_OVS_PORTS =  $purge_DEAD_OVS_PORTS"
+echo "       | | delete_NETWORK   =  $delete_NETWORK"
+echo "       | | name_OVS_BR      =  $name_OVS_BR"
+echo "       | | add_OVS_PORT     =  $add_OVS_PORT"
+echo "       | | lxd_CONT_NAME    =  $lxd_CONT_NAME"
 #echo "       | | NETWORK_NAME     =  $NETWORK_NAME"
-#echo "       | | PURGE_NETWORK    =  $PURGE_NETWORK"
-#echo "       | | OVS_ADD_PORT     =  $OVS_ADD_PORT"
-#echo "       | | OVS_BRIDGE_NAME  =  $OVS_BRIDGE_NAME"
-#echo "       | | LXD_CONT_NAME    =  $LXD_CONT_NAME"
 #echo "       | | Confirmed command line options are useable .... Continuing"
 dbg_FLAG="[d01.0e]/" && print_dbg_flags; 
 fi
@@ -257,17 +259,259 @@ fi
 #################################################################################
 # Testing break
 stop_dbg_break () {
-print_switch_vars
 if [ $dbg_BREAK = "true" ]; then
+    print_switch_vars
+    dbg_FLAG="[d00.0x] > Debugging Break Enabled! Stopping!" && print_dbg_flags; 
     exit 0
 fi
 }
 
 #################################################################################
+# Set LXD Daemon Key Values
+lxc_daemon_set () {
+    $lxd_CMD config set $key_lxd_SET
+    echo "Set LXD Daemon key to \"$lxd_NEW_KEY_VAL\""
+}
+
+#################################################################################
+# Set LXD Profile Key Values
+lxc_profile_set () {
+    $lxd_CMD profile set $lxd_PROFILE_NAME $key_lxd_SET
+    echo "Set LXD Profile \"$lxd_PROFILE_NAME\" key to \"$key_lxd_SET\""
+}
+
+#################################################################################
+# Set LXD Network Key Values
+lxc_network_set () {
+    $lxd_CMD network set $name_OVS_BR $key_lxd_SET
+    echo "Set LXD Network \"$name_OVS_BR\" key to \"$key_lxd_SET\""
+}
+
+#################################################################################
+# Set LXD Container Key Values
+lxc_container_set () {
+    $lxd_CMD config set $lxd_CONT_NAME $key_lxd_SET
+    echo "Set LXD Container \"$lxd_CONT_NAME\" key to \"$lxd_NEW_KEY_VAL\""
+}
+
+#################################################################################
+# Add interface to LXD Container on OVS Bridge
+# Format: command [option] [bridge-name] [interface-name] [container-name]
+# Command Example: 
+#   obb -p br0 eth2 container1
+# Checks value sanity on:
+# - Bridge Name
+# - Container Name
+# - Interface Name
+# If all values are sensible, will:
+# - Create a new network interface named as specified in command
+# - Attach new port to container specified
+# - Attach new port to OVS Bridge specified
+# - Set LXD container property to make interface name persistent
+add_ovs_port () {
+dbg_FLAG="[f02.0b] > OVS Port Build Starting " && print_dbg_flags; 
+if [ $lxd_CONT_NAME != "false" ]; then
+    
+    # Check if bridge name exists
+    dbg_FLAG="[f02.0o] > Checking for name sanity" && print_dbg_flags; 
+    ovs_br_check_if_exists
+
+    # Check if container name exists
+    dbg_FLAG="[s03.1o] > Checking if Container Exists ..." && print_dbg_flags; 
+    lxd_cont_check_if_exists
+
+    # check if port name already exists
+    dbg_FLAG="[f02.2r] > " && print_dbg_flags; 
+    ovs_iface_check_if_exists
+
+    # Error if bridge does not exist
+    # Error if container name does not exist
+    # Error if a port matching this name already exists
+    if [ $ovs_BR_IS_REAL != "0" ]; then
+        dbg_FLAG="[f02.0x] > Unable to find $name_OVS_BR" && print_dbg_flags; 
+        dbg_FLAG="[f02.0x] > Found the following bridge names:" && print_dbg_flags; 
+        ovs-vsctl list-br
+        echo "[f02.0x] Aborting port configuration due to error!"
+        echo "[f02.0x] ERROR: Bridge Name Not Found!"
+    elif [ $lxd_CONT_IS_REAL != "0" ]; then
+        dbg_FLAG="[f02.1x] > Unable to find $lxd_CONT_NAME"
+        dbg_FLAG="[f02.1x] > Found the following LXD Containers:
+        " && print_dbg_flags; 
+        $lxd_CMD list --format=csv -c n
+        echo ""
+        echo "[f02.1x] Aborting port configuration due to error!"
+        echo "[f02.1x] ERROR: Container Not Found!"
+    elif [ $ovs_IFACE_IS_UNIQUE = "0" ]; then
+        dbg_FLAG="[f02.2x] > " && print_dbg_flags; 
+        echo "[f02.2x] Aborting port configuration due to error!"
+        echo "[f02.2x] ERROR: Interface Name $add_OVS_PORT already in use!"
+    fi
+
+    # Continue if Bridge Name / Container Name / Iface Name vars all sane
+    # Else exit with error code 1
+    if [ $ovs_BR_IS_REAL = "0" ]   && \
+       [ $lxd_CONT_IS_REAL = "0" ] && \
+       [ $ovs_IFACE_IS_UNIQUE != "0" ]; then
+        dbg_FLAG="[f02.0s] > Found $name_OVS_BR"  && print_dbg_flags; 
+        dbg_FLAG="[f02.1s] > Found $lxd_CONT_NAME"  && print_dbg_flags; 
+        dbg_FLAG="[f02.2s] > Confirmed Port Name $add_OVS_PORT is useable " && print_dbg_flags; 
+    else
+        echo "[f02.2x] > Aborting!"
+        exit 1
+    fi
+
+    # Generate unique hardware mac address for interface
+    dbg_FLAG="[f02.3r] > " && print_dbg_flags; 
+    port_hwaddr_gen
+
+    # Generate lxd container key values
+    # ~IFACE_NAME sets the name of the device in the lxd configuration file
+    # ~IFACE_HOST_NAME creates a persistent ovs bridge device name
+    # ~IFACE_HWADDR uses the port_HWADDR_GEN value to set a static and repeatable mac
+    dbg_FLAG="[f02.4r] > " && print_dbg_flags; 
+    key_lxd_IFACE_NAME="volatile.$add_OVS_PORT.name $add_OVS_PORT"
+    key_lxd_IFACE_HOST_NAME="volatile.$add_OVS_PORT.host_name $add_OVS_PORT"
+    key_lxd_IFACE_HWADDR="volatile.$add_OVS_PORT.hwaddr $port_IFACE_HWADDR"
+    lxc_set_LIST="key_lxd_IFACE_NAME key_lxd_IFACE_HOST_NAME key_lxd_IFACE_HWADDR"
+
+    # Create interface and attach to LXD
+    # Set key values for IFACE_NAME, IFACE_HOST_NAME, and IFACE_HWADDR
+    dbg_FLAG="[f02.5r] > Attaching LXD Container $lxd_CONT_NAME to:" && print_dbg_flags;  
+    dbg_FLAG="[f02.5r] >           OVS Bridge:   $name_OVS_BR" && print_dbg_flags; 
+    dbg_FLAG="[f02.5r] >           On Port:      $add_OVS_PORT" && print_dbg_flags; 
+    if [ $ovs_BR_IS_REAL = "0" ] && \
+       [ $lxd_CONT_IS_REAL = "0" ] && \
+       [ $ovs_IFACE_IS_UNIQUE != "0" ]; then
+        $lxd_CMD network attach $name_OVS_BR $lxd_CONT_NAME $add_OVS_PORT
+        for key_lxd_SET in $lxc_set_LIST; do   
+            lxc_container_set
+            dbg_FLAG="[F02.5s] > Configured $key_lxd_SET" && print_dbg_flags; 
+        done
+    fi
+fi
+dbg_FLAG="[f02.0e] > OVS Port Build Complete" && print_dbg_flags; 
+}
+
+#################################################################################
+# Generate unique hardware mac address for interface
+# Uses container name, bridge name, and interface name as unique md5sum input
+# Will be globally unique while also being repeatable if required
+port_hwaddr_gen () {
+dbg_FLAG="[s05.0b] > Generating Unique MAC Address for $add_OVS_PORT..." \
+    && print_dbg_flags; 
+
+combined_HASH_INPUT="$name_OVS_BR$lxd_CONTAINER_NAME$add_OVS_PORT"
+port_IFACE_HWADDR=$( \
+    echo "$combined_HASH_INPUT" \
+    | md5sum \
+    | sed 's/^\(..\)\(..\)\(..\)\(..\)\(..\).*$/02:\1:\2:\3:\4:\5/')
+
+    dbg_FLAG="[s05.0s] > STAT: Using MAC Address: '$port_IFACE_HWADDR'" \
+    && print_dbg_flags; 
+}
+
+#################################################################################
+# Check if interface name is already configured
+ovs_iface_check_if_exists () {
+dbg_FLAG="[s04.0b] > Searching for OVS Port Name: $ovs_ADD ..." && print_dbg_flags; 
+for br in $(ovs-vsctl list-br); do 
+    ovs-vsctl list-ports $br | grep $add_OVS_PORT 
+    ovs_IFACE_IS_UNIQUE="$?"
+    dbg_FLAG="[s04.0s] > Interface Search Complete" && print_dbg_flags; 
+    if [ $ovs_IFACE_IS_UNIQUE = "0" ]; then 
+        echo "[s04.1s] > WARN: Found $add_OVS_PORT port on the $br OVS Bridge."
+    elif [ $ovs_IFACE_IS_UNIQUE != "0" ]; then 
+        echo "[s04.1x] > WARN: No Port Name $add_OVS_PORT found on this host."
+    fi
+done
+}
+
+#################################################################################
+# Check if lxd container name exists on host
+lxd_cont_check_if_exists () {
+    dbg_FLAG="[s03.0b] > Searching for LXD Container: $lxd_CONT_NAME ..." && print_dbg_flags 
+    $lxd_CMD list --format=csv -c n | grep $lxd_CONT_NAME ;
+    lxd_CONT_IS_REAL="$?"
+    dbg_FLAG="[s03.0e] > LXD Container Query Complete" && print_dbg_flags; 
+    if [ $lxd_CONT_IS_REAL = "0" ]; then 
+        echo "[s03.0s] > STAT: Found $lxd_CONT_NAME"
+    elif [ $lxd_CONT_IS_REAL != "0" ]; then 
+        echo "[s03.0x] > WARN: No Port Name $lxd_CONT_NAME found on this host."
+    fi
+}
+
+#################################################################################
+# Check if bridge name exists on host 
+ovs_br_check_if_exists () {
+dbg_FLAG="[s02.0b] > Searching for Bridge: $name_OVS_BR ..." && print_dbg_flags; 
+    ovs-vsctl list-br | grep $name_OVS_BR 
+    ovs_BR_IS_REAL="$?"
+if [ $ovs_BR_IS_REAL = "0" ]; then
+    dbg_FLAG="[s02.1e] > STAT: Found $name_OVS_BR ..." && print_dbg_flags; 
+elif [ $ovs_BR_IS_REAL != "0" ]; then
+    dbg_FLAG="[s02.0x] > WARN: No Bridge matching name: $name_OVS_BR" && print_dbg_flags; 
+fi
+}
+
+#################################################################################
+# Remove network bridge by name 
+# TODO add feature to prompt for confirmation & disconnect any containers on
+#      bridbridge to gracefully avoid error out/failure
+delete_network_bridge () {
+
+# Purge networks by name ) --purge | -p
+if [ $delete_NETWORK != "false" ]; then
+dbg_FLAG="[f01.0b] > Preparint to remove OVS Bridge: $delete_NETWORK ..." && print_dbg_flags;
+    name_OVS_BR="$delete_NETWORK"
+    ovs_br_check_if_exists 
+    if [ $ovs_BR_IS_REAL = "0" ]; then
+        echo "[f01.0r] > Found $name_OVS_BR"
+    elif [ $ovs_BR_IS_REAL != "0" ]; then
+        echo "[f01.0x] > Unable to find Bridge matching name: $delete_NETWORK "
+    fi
+
+    # Remove lxd network and profile
+    echo "[f01.1r] > Purging $delete_NETWORK from LXD Network and Profile configuration"
+    $lxd_CMD network delete $delete_NETWORK > /dev/null 2>&1 ;
+    $lxd_CMD profile delete $delete_NETWORK > /dev/null 2>&1 
+
+    # Remove virsh network configuration
+    echo "[f01.2r] > Purging $delete_NETWORK from Libvirt Network Configuration"
+    virsh net-undefine $delete_NETWORK > /dev/null 2>&1 ;
+    virsh net-destroy $delete_NETWORK > /dev/null 2>&1 ;
+
+    # Remove OVS Bridge
+    echo "[f01.3r] > Purging OpenVswitch Configuration"
+    ovs-vsctl del-br $delete_NETWORK > /dev/null 2>&1  ;
+
+    # Remove ifup file
+    echo "[f01.4r] > Removing ifup $name_OVS_BR.cfg"
+    rm /etc/network/interfaces.d/iface-$name_OVS_BR.cfg > /dev/null 2>&1 ;
+
+    # Confirm when done
+    echo "[f01.5r] > Finished Purging $delete_NETWORK from system"
+
+fi
+dbg_FLAG="[f01.0e] > Network Removal Complete for $delete_NETWORK ..." && print_dbg_flags;
+}
+
+#################################################################################
+# Purge dead OVS Interfaces
+purge_dead_iface_all () {
+dbg_FLAG="[h05.0b] > Purging On All OVS Bridges" && print_dbg_flags; 
+dead_OVS_IFACE=$(ovs-vsctl show | awk '$1 - /error:/{print $7;}')
+for iface in $dead_OVS_IFACE; do 
+    ovs-vsctl del-port $iface; 
+    dbg_FLAG="[h05.0r] > Successfully removed $dead_OVS_IFACE" && print_dbg_flags; 
+done
+dbg_FLAG="[h05.0e] > Purge Complete" && print_dbg_flags; 
+}
+     
+#################################################################################
 # Start dead service if service found to not be running
 # Will also attempt to enable the service at boot as well
 start_system_service () {
-dbg_FLAG="[f3h.0o] $dead_SERVICE_NAME not running, attempting to re-start..." && print_dbg_flags; 
+dbg_FLAG="[s01.0b] > Attempting to re-start $dead_SERVICE_NAME ..." && print_dbg_flags; 
 
 # try to start dead service
 systemctl start $dead_SERVICE_NAME
@@ -282,20 +526,22 @@ systemctl is-active $dead_SERVICE_NAME
 if [ $(systemctl is-enabled "$dead_SERVICE_NAME") != "0" ]; then
     systemctl enable $dead_SERVICE_NAME
     if [ $? != "0" ]; then
-        echo "WARN: $dead_SERVICE_NAME is not currently enabled to start at boot"
-        echo "WARN: and OBB was unable to enable the service"
+    dbg_FLAG="[s01.1r] > WARN: $dead_SERVICE_NAME is not currently enabled to start at boot" \
+        && print_dbg_flags; 
+    dbg_FLAG="[s01.1r] > WARN: OBB could not enable the service" \
+        && print_dbg_flags; 
     fi
 fi
 
 # If service starts successfully, attempt to re-run the previous function
 # ... or die trying
 if [ $? = 0 ]; then
-    dbg_FLAG="[f3h.0o] Successfully restarted $dead_SERVICE_NAME" && print_dbg_flags; 
-    dbg_FLAG="[f3h.0o] Retrying $rerun_start_function" && print_dbg_flags; 
+    dbg_FLAG="[s01.2r] > Successfully restarted $dead_SERVICE_NAME" && print_dbg_flags; 
+    dbg_FLAG="[s01.2r] > Retrying $rerun_start_function" && print_dbg_flags; 
     rerun_at_function
 elif [ $(systemctl is-active $dead_SERVICE_NAME) != 0 ]; then
-        echo "ERROR: Unable to start dead service $dead_SERVICE_NAME!"
-        echo "Unrecoverable error ... Aborting!"
+        echo "[s01.3r] > ERROR: Unable to start dead service $dead_SERVICE_NAME!"
+        echo "[s01.3r] > Unrecoverable error ... Aborting!"
     exit 1
 fi
 }
@@ -303,6 +549,7 @@ fi
 #################################################################################
 # Check that required services are running
 virt_services_is_enabled () {
+dbg_FLAG="[h03.0b] > Querying Starting ..." && print_dbg_flags; 
 
 # Load System Service Status
 ovs_SERVICE_STATUS=$(systemctl is-active $ovs_SERVICE_NAME)
@@ -310,7 +557,7 @@ lxd_SERVICE_STATUS=$(systemctl is-active $lxd_SERVICE_NAME)
 libvirt_SERVICE_STATUS=$(systemctl is-active $libvirt_SERVICE_NAME)
 
 # Display Service Status
-dbg_FLAG="[f3h.0o] > Showing Local service health:
+dbg_FLAG="[h03.0r] > Showing Local service health:
 " && print_dbg_flags; 
 echo "OpenVSwitch Service Name = $ovs_SERVICE_NAME"
 echo "                  Status = $ovs_SERVICE_STATUS
@@ -325,26 +572,30 @@ echo "                  Status = $libvirt_SERVICE_STATUS
 # If OVS Service is not active, error & attempt to start service
 if [ "$ovs_SERVICE_STATUS" != active ]; then
     dead_SERVICE_NAME="ovs_SERVICE_NAME"
-    echo "ERROR: The OpenVSwitch System Service is NOT RUNNING"
-    echo "Attempting to start $dead_SERVICE_NAME"
+    dbg_FLAG="[h03.1r] > WARN: Dead Service Found  =  $dead_SERVICE_NAME"
+    echo " > ERROR: The OpenVSwitch System Service is NOT RUNNING"
+    echo " > Attempting to start $dead_SERVICE_NAME"
     start_system_service 
 fi
 
 # If LXD Service is not active, error & attempt to start service
 if [ "$lxd_SERVICE_STATUS" != "active" ]; then
     dead_SERVICE_NAME="lxd_SERVICE_NAME"
-    echo "ERROR: The LXD System Service IS NOT RUNNING"
-    echo "Attempting to start $dead_SERVICE_NAME"
+    dbg_FLAG="[h03.2r] > WARN: Dead Service Found  =  $dead_SERVICE_NAME"
+    echo " > ERROR: The LXD System Service IS NOT RUNNING"
+    echo " > Attempting to start $dead_SERVICE_NAME"
     start_system_service 
 fi
 
 # If Libvirtd Service is not active, error & attempt to start service
 if [ "$libvirt_SERVICE_STATUS" != "active" ]; then
     dead_SERVICE_NAME="libvirt_SERVICE_NAME"
-    echo "$SEP_2 ERROR: The LibVirtD System Service IS NOT RUNNING"
-    echo "Attempting to start $dead_SERVICE_NAME"
+    dbg_FLAG="[h03.3r] > WARN: Dead Service Found  =  $dead_SERVICE_NAME"
+    echo " > ERROR: The LibVirtD System Service IS NOT RUNNING"
+    echo " > Attempting to start $dead_SERVICE_NAME"
     start_system_service 
 fi
+dbg_FLAG="[h03.0e] > Query Complete" && print_dbg_flags; 
 }
 
 #################################################################################
@@ -352,6 +603,7 @@ fi
 print_config () {
 # Check that required services are running
 # virt_services_is_enabled
+dbg_FLAG="[h04.0b] > Querying Host OVS Configuration" && print_dbg_flags; 
 
 # Load System Service Status
 ovs_SERVICE_STATUS=$(systemctl is-active $ovs_SERVICE_NAME)
@@ -359,32 +611,33 @@ lxd_SERVICE_STATUS=$(systemctl is-active $lxd_SERVICE_NAME)
 libvirt_SERVICE_STATUS=$(systemctl is-active $libvirt_SERVICE_NAME)
 
 # List Openvswitch Networks
-dbg_FLAG="[f3h.0o] > Showing Local Bridge Configuration" && print_dbg_flags; 
+dbg_FLAG="[h04.1r] > Showing Local Bridge Configuration" && print_dbg_flags; 
 if [ "$libvirt_SERVICE_STATUS" = "active" ] && \
        [ "$lxd_SERVICE_STATUS" = "active" ] && \
        [ "$ovs_SERVICE_STATUS" = "active" ]; then
 
     # List OpenVSwitch Networks
-    dbg_FLAG="[f3h.0o] > OpenVSwitch Network Configuration
+    dbg_FLAG="[h04.2r] > OpenVSwitch Network Configuration
              " && print_dbg_flags; 
     echo "  > OpenVSwitch Network Configuration <
     "
     ovs-vsctl show
 
     # List LXD Networks
-    dbg_FLAG="[f3h.0o] > LXD Network Configuration
+    dbg_FLAG="[h04.3r] > LXD Network Configuration
              " && print_dbg_flags; 
     echo "  > LXD Network Configuration <
     "
     $lxd_CMD network list
 
     # List LibVirtD Networks
-    dbg_FLAG="[f3h.0o] > Libvirtd Network Configuration
+    dbg_FLAG="[h04.4r] > Libvirtd Network Configuration
              " && print_dbg_flags; 
     echo "  > LibVirtD Network Configuration < 
     "
     virsh net-list --all
 fi
+dbg_FLAG="[h04.0e] > Host Config Query Complete" && print_dbg_flags; 
 }
 
 #################################################################################
@@ -397,20 +650,25 @@ print_help_short () {
     syntax: command [option] [value]
 
     Options:
-                         -h    --    Print the basic help menu
-       --help                  --    Print the extended help menu
-       --                -H    --    Check OVS|LXD|Libvirtd Service Status
-       --                -s    --    Show current networks configured locally
-       --                -p    --    Add port to bridge and optionally connect
-                                     port to container named. 
-                                     Value Ordering:
-                                        [bridge] [port] [container] 
-       --                -d    --    Deletes network when pased with a value
-                                     matching an existing network name.
-       --                -b    --    Sets the name for building the following: 
-                                        OVS Bridge
-                                        Libvirt Bridge
-                                        LXD Network & Profile Name
+                         -h    Print the basic help menu
+       --help                  Print the extended help menu
+       --show-health     -H    Check OVS|LXD|Libvirtd Service Status
+       --show-config     -s    Show current networks configured locally
+       --purge-ports           Purge orphaned OVS ports 
+                                  Usually seen in the following command output as
+                                  'no such device' errors
+                                      'ovs-vsctl show'
+                                      'obb -s | obb --show-config'
+       --add-port        -p    Add port to bridge and optionally connect port to 
+                               container if named. 
+                               Value Ordering:
+                                  [bridge] [port] [container] 
+       --del-br          -d    Deletes network when pased with a value
+                               matching an existing network name.
+       --new-bridge      -b    Sets the name for building the following: 
+                                  OVS Bridge
+                                  Libvirt Bridge
+                                  LXD Network & Profile Name
 "
 if [ $show_HELP_LONG = "false" ]; then
     dbg_FLAG="[h01.0e] > Print Short End" && print_dbg_flags; 
@@ -471,6 +729,8 @@ ________________/
 #################################################################################
 # Initial function that determines behavior from command line flags
 cmd_parse_run () {
+#stop_dbg_break 
+print_switch_vars 
 if [ $show_HELP = 'true' ]; then
     dbg_FLAG="[h01.0o] > Showing Help Menu" && print_dbg_flags; 
     if [ $show_HELP_LONG = 'false' ]; then
@@ -486,17 +746,35 @@ if [ $show_HELP = 'true' ]; then
     exit 0
     fi
 fi
-stop_dbg_break 
 if [ $show_HEALTH != 'false' ]; then
-    dbg_FLAG="[h03.0o]" && print_dbg_flags; 
+    dbg_FLAG="[h03.0o] > Querying Virt Services Status" && print_dbg_flags; 
     virt_services_is_enabled
-    dbg_FLAG="[h03.0c]" && print_dbg_flags; 
+    dbg_FLAG="[h03.0c] > Health Check Complete" && print_dbg_flags; 
 exit 0
 fi
 if [ $show_CONFIG != 'false' ]; then
-    dbg_FLAG="[h04.0o]" && print_dbg_flags; 
+    dbg_FLAG="[h04.0o] > Showing Host Network Configuration " && print_dbg_flags; 
     print_config
-    dbg_FLAG="[h04.0c]" && print_dbg_flags; 
+    dbg_FLAG="[h04.0c] > $obb_VERSION" && print_dbg_flags; 
+exit 0
+fi
+if [ $purge_DEAD_OVS_PORTS = 'true' ]; then
+    dbg_FLAG="[h05.0o] > Purge Dead OVS Ports" && print_dbg_flags; 
+    purge_dead_iface_all
+    dbg_FLAG="[h05.0c] > $obb_VERSION" && print_dbg_flags; 
+exit 0
+fi
+if [ $delete_NETWORK != 'false' ]; then
+        dbg_FLAG="[f01.0o] > Requesting to remove $delete_NETWORK ..." && print_dbg_flags;
+        delete_network_bridge
+        print_config
+        dbg_FLAG="[f01.0c] > Purged $delete_NETWORK Bridge" && print_dbg_flags; 
+    exit 0
+fi
+if [ $add_OVS_PORT != 'false' ]; then
+    dbg_FLAG="[f02.0o] > Addinng New OVS Port $add_OVS_PORT" && print_dbg_flags; 
+    add_ovs_port 
+    dbg_FLAG="[f02.0c] > Done adding OVS Port $add_OVS_PORT" && print_dbg_flags; 
 exit 0
 fi
 }
