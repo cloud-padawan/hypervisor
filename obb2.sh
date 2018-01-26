@@ -267,31 +267,55 @@ fi
 }
 
 #################################################################################
+lxd_cont_resume () {
+    $lxd_CMD start $lxd_CONT_NAME
+}
+
+#################################################################################
+# Check LXD Container Run State
+# Halt if running 
+# And set flag 
+lxd_cont_halt () {
+# TODO @setuid
+# How does one make following the awk pattern matching work off variable within
+# the "'" quotes? 
+#lxc_CONT_IS_STATE=$($lxd_CMD list \
+#    --format=csv -c n,s | awk -F',' '/$lxd_CONT_NAME/{print $2}' )
+lxc_CONT_IS_STATE=$($lxd_CMD list \
+    --format=csv -c n,s | grep $lxd_CONT_NAME | awk -F',' '{print $2}' )
+if [ $lxc_CONT_IS_STATE = 'RUNNING' ]; then
+    echo "LXD Container $lxd_CONT_NAME is currently running"
+    echo "Stopping Container"
+    $lxd_CMD stop $lxd_CONT_NAME
+fi
+}
+
+#################################################################################
 # Set LXD Daemon Key Values
 lxc_daemon_set () {
-    $lxd_CMD config set $key_lxd_SET
     echo "Set LXD Daemon key to \"$lxd_NEW_KEY_VAL\""
+    $lxd_CMD config set $key_lxd_SET
 }
 
 #################################################################################
 # Set LXD Profile Key Values
 lxc_profile_set () {
-    $lxd_CMD profile set $lxd_PROFILE_NAME $key_lxd_SET
     echo "Set LXD Profile \"$lxd_PROFILE_NAME\" key to \"$key_lxd_SET\""
+    $lxd_CMD profile set $lxd_PROFILE_NAME $key_lxd_SET
 }
 
 #################################################################################
 # Set LXD Network Key Values
 lxc_network_set () {
-    $lxd_CMD network set $name_OVS_BR $key_lxd_SET
     echo "Set LXD Network \"$name_OVS_BR\" key to \"$key_lxd_SET\""
+    $lxd_CMD network set $name_OVS_BR $key_lxd_SET
 }
 
 #################################################################################
 # Set LXD Container Key Values
 lxc_container_set () {
+    echo "[xXX.Xx] > Set LXD Container \"$lxd_CONT_NAME\" key to \"$key_lxd_SET\""
     $lxd_CMD config set $lxd_CONT_NAME $key_lxd_SET
-    echo "Set LXD Container \"$lxd_CONT_NAME\" key to \"$lxd_NEW_KEY_VAL\""
 }
 
 #################################################################################
@@ -363,6 +387,9 @@ if [ $lxd_CONT_NAME != "false" ]; then
     # Generate unique hardware mac address for interface
     dbg_FLAG="[f02.3r] > " && print_dbg_flags; 
     port_hwaddr_gen
+        
+    
+    $lxd_CMD config device remove $lxd_CONT_NAME $add_OVS_PORT
 
     # Generate lxd container key values
     # ~IFACE_NAME sets the name of the device in the lxd configuration file
@@ -370,24 +397,33 @@ if [ $lxd_CONT_NAME != "false" ]; then
     # ~IFACE_HWADDR uses the port_HWADDR_GEN value to set a static and repeatable mac
     # TODO Fix 372-391, keys do not pickup values
     dbg_FLAG="[f02.4r] > " && print_dbg_flags; 
-    key_lxd_IFACE_NAME="volatile.$add_OVS_PORT.name $add_OVS_PORT"
-    key_lxd_IFACE_HOST_NAME="volatile.$add_OVS_PORT.host_name $add_OVS_PORT"
-    key_lxd_IFACE_HWADDR="volatile.$add_OVS_PORT.hwaddr $port_IFACE_HWADDR"
-    lxc_set_LIST="key_lxd_IFACE_NAME key_lxd_IFACE_HOST_NAME key_lxd_IFACE_HWADDR"
+    #key_lxd_IFACE_NAME="volatile.$add_OVS_PORT.name $add_OVS_PORT"
+    #key_lxd_IFACE_HOST_NAME="volatile.$add_OVS_PORT.host_name $add_OVS_PORT"
+    #key_lxd_IFACE_HWADDR="volatile.$add_OVS_PORT.hwaddr $port_IFACE_HWADDR"
+    #lxc_set_LIST="key_lxd_IFACE_NAME key_lxd_IFACE_HOST_NAME key_lxd_IFACE_HWADDR"
 
     # Create interface and attach to LXD
     # Set key values for IFACE_NAME, IFACE_HOST_NAME, and IFACE_HWADDR
     dbg_FLAG="[f02.5r] > Attaching LXD Container $lxd_CONT_NAME to:" && print_dbg_flags;  
     dbg_FLAG="[f02.5r] >           OVS Bridge:   $name_OVS_BR" && print_dbg_flags; 
     dbg_FLAG="[f02.5r] >           On Port:      $add_OVS_PORT" && print_dbg_flags; 
+    dbg_FLAG="[f02.5r] >           HW Address:   $port_IFACE_HWADDR
+    " && print_dbg_flags; 
     if [ $ovs_BR_IS_REAL = "0" ] && \
        [ $lxd_CONT_IS_REAL = "0" ] && \
        [ $ovs_IFACE_IS_UNIQUE != "0" ]; then
+        lxd_cont_halt
         $lxd_CMD network attach $name_OVS_BR $lxd_CONT_NAME $add_OVS_PORT
-        for key_lxd_SET in $lxc_set_LIST; do   
-            lxc_container_set
-            dbg_FLAG="[F02.5s] > Configured $key_lxd_SET" && print_dbg_flags; 
-        done
+        $lxd_CMD config set $lxd_CONT_NAME volatile.$add_OVS_PORT.name $add_OVS_PORT
+        $lxd_CMD config set $lxd_CONT_NAME volatile.$add_OVS_PORT.host_name $add_OVS_PORT
+        $lxd_CMD config set $lxd_CONT_NAME volatile.$add_OVS_PORT.hwaddr $port_IFACE_HWADDR
+        if [ lxd_CONT_IS_RUNNING = "RUNNING" ]; then
+            lxd_cont_resume
+        fi
+#       for key_lxd_SET in $key_lxd_IFACE_NAME $key_lxd_IFACE_HOST_NAME $key_lxd_IFACE_HWADDR; do 
+#           lxc_container_set
+#           dbg_FLAG="[F02.5s] > Configured $key_lxd_SET" && print_dbg_flags; 
+#       done
     fi
 fi
 dbg_FLAG="[f02.0e] > OVS Port Build Complete" && print_dbg_flags; 
