@@ -40,7 +40,7 @@ ln -s /etc/ccio/tools/obb.sh /usr/bin/obb
 #################################################################################
 # Download virt setup installer
 download_virt_requirements () {
-virt_BUILD_ENV_URL="https://raw.githubusercontent.com/containercraft/hypervisor/master/install-ccio-hypervisor.sh"
+virt_BUILD_ENV_URL="https://raw.githubusercontent.com/containercraft/hypervisor/master/ccio-build-environment-setup.sh"
 
 wget -O /etc/ccio/tools/ccio-build-environment-setup.sh $virt_BUILD_ENV_URL
 chmod +x /etc/ccio/tools/ccio-build-environment-setup.sh
