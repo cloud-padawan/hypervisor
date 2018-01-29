@@ -3,21 +3,22 @@ CCIO Hypervisor installer & OVS BridgeBuilder
 
 Hypervisor configuration and management tools
 
-## To Install:
-  Option 1: Install full hypervisor setup and CCIO-Utils 
-"  
-  $ sudo curl -L https://raw.githubusercontent.com/containercraft/hypervisor/master/install.sh | bash
-  $ sudo ccio-install
+#### To Install:
+  Option 1: Install full hypervisor setup and CCIO-Utils
+
+ '$ sudo curl -L https://raw.githubusercontent.com/containercraft/hypervisor/master/install.sh | bash'
+
+'$ sudo ccio-install                                                                                '
 
 "
-  Option 2: Install CCIO-Utils Only 
+####  Option 2: Install CCIO-Utils Only
   - Requires that OpenVSwitch+Libvirt+LXD already be configured
-  "
-  TODO Write install-utils-only.sh
-  $ sudo ccio-install
-  "
 
-## Purpose:
+>  TODO Write install-utils-short.sh
+>
+>  $ sudo ccio-install
+
+# Purpose:
 
 This tooling provides a common platform to quickly and seamlessly build virtual environments.
 
@@ -48,17 +49,38 @@ The tooling also needs to be consistent across hardware platforms including:
   + 100% virtual tenants
   + multi host rack systems
 
-##  Usage and Syntax:
-       command [option] [value]
+#  Usage and Syntax:
+| OpenVSwitch Bridge Builder
 
-    This tool will create a new OVS bridge.
-    By default, this bridge will be ready for use with each of the following:
+| syntax: command [option] [value]
+
+Options:
+
+                     -h    Print the basic help menu
+   --help                  Print the extended help menu
+   --show-health     -H    Check OVS|LXD|Libvirtd Service Status
+   --show-config     -s    Show current networks configured locally
+   --ovs-del-orphans       Purge orphaned OVS ports
+                           Seen as 'no such device' error from following commands:
+                              'ovs-vsctl show'
+                              'obb -s | obb --show-config'
+   --add-port        -p    Add port to bridge and optionally connect port to
+                           container if named.
+                           Value Ordering:
+                              [bridge] [port] [container]
+   --del-br          -d    Deletes network when pased with a value
+                           matching an existing network name.
+   --add-bridge      -b    Sets the name for building the following:
+                              OVS Bridge
+                              Libvirt Bridge
+                              LXD Network & Profile Name
+
 
        LXD:
         \_______       
-                \_Launch a container with the "lxd profile" flag to attach
+                \_Launch a container with the lxd profile flag to attach
                 |    Example:                                               
-                |      lxc launch ubuntu: test-container -p $NETWORK_NAME
+                |      $ lxc launch ubuntu: test-container -p $network
 
        Libvirt Guests:
         \_______
@@ -70,20 +92,18 @@ The tooling also needs to be consistent across hardware platforms including:
        Physical Ports:
         \_______
                 \_Attach Physical Ports via the following
-                |   Example with physical device name eth0
-                |      ovs-vsctl add-port obb eth0
+                |   Example with physical device name "eth0"
+                |      ovs-vsctl add-port $NETWORK_NAME eth0
 
-    Options:
-       --help            -h    --    Print this help menu
-       --health-check    -H    --    Check OVS|LXD|Libvirtd Service Status
-       --show-config     -c    --    Show current networks configured locally
-       --purge           -p    --    Purges network when pased with a value
-                                     matching an existing network name.
-       --name            -n    --    Sets the name for building the following:
-                                        OVS Bridge
-                                        Libvirt Bridge
-                                        LXD Network & Profile Name
-
-       |------------------------------------------------------------------+
-       | OVS_BridgeBuilder_VERSION = v00.81.a
-       |------------------------------------------------------------------+
+       Logical Ports:
+        \_______
+                \_Create and Attach Logical Ports via the following
+                |   Examples with the following criteria:
+                |
+                |          OVS Bridge Name:  mybridge
+                |        New OVS Port-Name:  eth0
+                |            LXD Container:  mycontainer < (optional)
+                |
+                |      $ obb --add-port mybridge eth0  
+                |      $ obb --add-port mybridge eth0 mycontainer
+                |

@@ -1,0 +1,51 @@
+#!/bin/bash
+# This conf file is an example that works on an Arch Linux install
+# To use non-supported OS distributions you must manually:
+# - install Libvirt+KVM+QEMU
+# - install OpenVSwitch (DPDK SUPPORT RECOMMENDED ON INTEL SYSTEMS)
+# - install LXD via PPA or SNAP
+# Create the /etc/ccio, /etc/ccio/tools and /etc/ccio/virsh_xml directories
+# Save this template to /etc/ccio/ccio.conf
+# Download ovs-bridge-builder.sh and save in /etc/ccio/tools
+# ln /etc/ccio/tools/ovs-bridge-builder.sh /usr/bin/obb
+
+# OVS-BridgeBuilder  --  Virtual Network Management utility
+# 
+# Use to manage LXD & Libvirt OpenVswitch Networks
+# This is currently only tested on Arch and Ubuntu-Xenial; YMMV on other
+# distros
+#
+# Requires LXD, Libvirt, and OpenVSwitch services
+# 
+# Initial prep and variable are sourced from the ccio.conf file
+# All actions are executed within functions
+# All functions originate from the " function first
+# The "RUN" function starts at the bottom of the script
+# All other functions are arranged roughly in the order of the script's logic
+# from bottom to top. 
+
+# Debugging Switches
+dbg_BREAK="true"
+print_DBG_FLAGS="true"
+
+# Default Run Values
+xml_FILE_DIR="/etc/ccio/virsh_xml"
+show_HELP="false"
+show_HELP_LONG="false"
+show_HEALTH="false"
+show_CONFIG="false"
+ovs_SERVICE_NAME="ovs-vswitchd.service"
+lxd_SERVICE_NAME="lxd.service"
+libvirt_SERVICE_NAME="libvirtd.service"
+ovs_BR_DRIVER="openvswitch"
+lxd_CMD="lxc"
+purge_DEAD_OVS_PORTS="false"
+delete_NETWORK="false"
+add_OVS_PORT="false"
+default_BR_NAME="ovsbr01"
+name_OVS_BR="$default_BR_NAME"
+lxd_CONT_NAME="false"
+ovs_BR_NAME="false"
+ovs_ADD_PORT="false"
+
+dbg_FLAG="[d00.0b] > Imported ccio.conf" && print_dbg_flags;

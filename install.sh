@@ -52,6 +52,7 @@ seed_ccio_filesystem () {
 echo "Seeding CCIO file system ..."
 mkdir -p /etc/ccio/tools
 
+# Determine host system's service names for ovs/libvirt/lxd
 echo "Checking service names ..."
 lxd_SVC_NAME_CHECK=$(systemctl list-unit-files \
                     | grep -E "lxd.service|snap.lxd.daemon.service")
@@ -60,33 +61,45 @@ ovs_SVC_NAME_CHECK=$(systemctl list-unit-files \
 libvirt_SVC_NAME_CHECK=$(systemctl list-unit-files \
                     | grep -E "libvirt.service")
 
+# Write ccio.conf
 echo "Writing ccio.conf ..."
 cat >/etc/ccio/ccio.conf <<EOF
+# OVS-BridgeBuilder  --  Virtual Network Management utility
+# 
+# Use to manage LXD & Libvirt OpenVswitch Networks
+# This is currently only tested on Arch and Ubuntu-Xenial; YMMV on other
+# distros
+#
+# Requires LXD, Libvirt, and OpenVSwitch services
+# 
+# Initial prep and variable are sourced from the ccio.conf file
+# All actions are executed within functions
 
-# Default Variables
-# Used unless otherwise set in ccio.conf or at command line
-# Debug & Verbosity Settings:
-print_DBG_FLAGS="true"
+# Debugging Switches [true|false]
 dbg_BREAK="true"
+print_DBG_FLAGS="true"
 
-# Operating Variables
+# Default Run Values
+xml_FILE_DIR="/etc/ccio/virsh_xml"
+show_HELP="false"
+show_HELP_LONG="false"
+show_HEALTH="false"
+show_CONFIG="false"
 ovs_SERVICE_NAME="$ovs_SVC_NAME"
 lxd_SERVICE_NAME="$lxd_SVC_NAME_CHECK"
 libvirt_SERVICE_NAME="$libvirt_SVC_NAME_CHECK"
-default_NETWORK_NAME="obb"
-network_NAME="$default_NETWORK_NAME"
-tmp_FILE_STORE="/tmp/bridge-builder/"
-bridge_DRIVER="openvswitch"
+ovs_BR_DRIVER="openvswitch"
+lxd_CMD="lxc"
+purge_DEAD_OVS_PORTS="false"
 delete_NETWORK="false"
-ovs_ADD_PORT="false"
-ovs_BRIDGE_NAME="false"
+add_OVS_PORT="false"
+default_BR_NAME="ovsbr01"
+name_OVS_BR="$default_BR_NAME"
 lxd_CONT_NAME="false"
-show_CONFIG="false"
-show_HEALTH="false"
-show_HELP="false"
-show_HELP_LONG="false"   
-running_function="false"
+ovs_BR_NAME="false"
+ovs_ADD_PORT="false"
 
+dbg_FLAG="[d00.0b] > Imported ccio.conf" && print_dbg_flags;
 EOF
 }
 
