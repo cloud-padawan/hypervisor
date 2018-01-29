@@ -55,6 +55,7 @@ fi
 # Configure and validate libvirt installation
 configure_libvirt () {
 echo "WARNING! All automated Libvirt configuration currently disabled!!!"
+mkdir -p /etc/ccio/virsh_xml
 virt-host-validate
 }
 
@@ -76,7 +77,7 @@ echo "$SEP_2 Installed LibvirtD + KVM + QEMU Requirements!"
 #################################################################################
 prompt_libvirt_install () {
 while true; do
-   	read -p "$SEP_2 Do you want to continue installation?"
+   	read -p "$SEP_2 Do you want to continue installation?" yn
    	case $yn in
    		[Yy]* ) echo "$SEP_2 Continuing ..." ; 
             libvirt_install
