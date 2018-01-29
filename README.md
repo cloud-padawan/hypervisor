@@ -6,11 +6,11 @@ Hypervisor configuration and management tools
 #### To Install:
   Option 1: Install full hypervisor setup and CCIO-Utils
 
- '$ sudo curl -L https://raw.githubusercontent.com/containercraft/hypervisor/master/install.sh | bash'
+ ' $ sudo curl -L https://raw.githubusercontent.com/containercraft/hypervisor/master/ccio-build-environment-setup.sh | bash '
 
-'$ sudo ccio-install                                                                                '
+' $ sudo ccio-install                                                                                '
 
-"
+
 ####  Option 2: Install CCIO-Utils Only
   - Requires that OpenVSwitch+Libvirt+LXD already be configured
 

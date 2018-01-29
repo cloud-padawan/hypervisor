@@ -10,6 +10,7 @@ fi
 
 #################################################################################
 install_virt_requirements () {
+rm /usr/bin/ccio-install
 ln -s /etc/ccio/tools/install_ccio_build_env.sh /usr/bin/ccio-install
 
 echo "
@@ -32,6 +33,7 @@ url_OBB="https://raw.githubusercontent.com/containercraft/hypervisor/master/ovs-
 echo "Installing OVS_Bridge_Builder"
 wget -O /etc/ccio/tools/obb.sh $url_OBB
 chmod +x /etc/ccio/tools/obb.sh
+rm /usr/bin/obb
 ln -s /etc/ccio/tools/obb.sh /usr/bin/obb
 }
 
