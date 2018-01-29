@@ -11,7 +11,7 @@ fi
 #################################################################################
 install_virt_requirements () {
 rm /usr/bin/ccio-install
-ln -s /etc/ccio/tools/install_ccio_build_env.sh /usr/bin/ccio-install
+ln -s /etc/ccio/tools/ccio-build-environment-setup.sh /usr/bin/ccio-install
 
 echo "
 
@@ -42,8 +42,8 @@ ln -s /etc/ccio/tools/obb.sh /usr/bin/obb
 download_virt_requirements () {
 virt_BUILD_ENV_URL="https://raw.githubusercontent.com/containercraft/hypervisor/master/install-ccio-hypervisor.sh"
 
-wget -O /etc/ccio/tools/install_ccio_build_env.sh $virt_BUILD_ENV_URL
-chmod +x /etc/ccio/tools/install_ccio_build_env.sh
+wget -O /etc/ccio/tools/ccio-build-environment-setup.sh $virt_BUILD_ENV_URL
+chmod +x /etc/ccio/tools/ccio-build-environment-setup.sh
 }
 
 #################################################################################
