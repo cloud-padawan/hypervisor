@@ -64,7 +64,7 @@ print_DBG_FLAGS="true"
 # Debug output 
 print_dbg_flags () {
 if [ $print_DBG_FLAGS = "true" ]; then
-    echo "$dbg_FLAG"
+    echo ">> >> $dbg_FLAG"
 fi
 }
 
@@ -154,7 +154,7 @@ else
     echo "$SEP_2 Showing pool information
     "
     zpool list $zpool_NAME
-    lxc storage list | grep $zpool_NAME
+    #lxc storage list | grep $zpool_NAME
     echo ""
     while true; do
     read -p "Are you sure $zpool_NAME is safe to erase?" yn
@@ -244,7 +244,8 @@ echo "$SEP_2 Installed LXD requirements successfully!"
 install_lxd_snap () {
     apt purge lxd lxd-client -y
     apt install -y zfsutils-linux squashfuse
-    snap install lxd --edge
+    snap install lxd 
+    snap refresh lxd --edge
 }
 
 #################################################################################
