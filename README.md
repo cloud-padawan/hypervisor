@@ -10,6 +10,10 @@ Hypervisor configuration and management tools
 
     sudo ccio-install                                                                                
 
+#### Alternate short install link:
+    
+    sudo curl -L https://goo.gl/XCMf5u | bash
+
 ## Purpose:
 
 This tooling provides a common platform to quickly and seamlessly build virtual environments.
