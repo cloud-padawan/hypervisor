@@ -64,6 +64,7 @@ libvirt_SVC_NAME_CHECK=$(systemctl list-unit-files \
                     | grep -E "libvirt.service")
 
 # Write ccio.conf
+default_BR_NAME="ovsbr01"
 echo "Writing ccio.conf ..."
 cat >/etc/ccio/ccio.conf <<EOF
 # OVS-BridgeBuilder  --  Virtual Network Management utility
@@ -99,6 +100,7 @@ default_BR_NAME="ovsbr01"
 name_OVS_BR="$default_BR_NAME"
 lxd_CONT_NAME="false"
 ovs_BR_NAME="false"
+add_OVS_BR="false"
 ovs_ADD_PORT="false"
 
 dbg_FLAG="[d00.0b] > Imported ccio.conf" && print_dbg_flags;

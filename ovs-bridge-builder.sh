@@ -94,7 +94,7 @@ fi
 dbg_FLAG="[d00.2r] > Enabling Command Line Options" && print_dbg_flags; 
 OPTS=`getopt \
     -o bpdsHhz: \
-    --long add-bridge,add-port,del-br,purge-ports,show-config,show-health,help,zee: \
+    --long add-bridge,add-port,del-br,ovs-rm-orphans,show-config,show-health,help,zee: \
     -n 'parse-options' -- "$@"`
 
 # Fail if options are not sane
@@ -128,7 +128,7 @@ while true; do
            show_CONFIG=true ; 
            shift
            ;;
-       --purge-ports      ) 
+       --ovs-rm-orphans   ) 
            purge_DEAD_OVS_PORTS="true"; 
            shift 
            ;;
@@ -404,7 +404,7 @@ dbg_FLAG="[s01.0b] > Attempting to re-start $dead_SERVICE_NAME ..." && print_dbg
 
 # try to start dead service
 systemctl start $dead_SERVICE_NAME
-wait 10
+sleep 10
 systemctl is-active $dead_SERVICE_NAME
 
 # If the dead service is not enabled:
@@ -907,7 +907,7 @@ print_help_short () {
        --help                  Print the extended help menu
        --show-health     -H    Check OVS|LXD|Libvirtd Service Status
        --show-config     -s    Show current networks configured locally
-       --ovs-del-orphans       Purge orphaned OVS ports 
+       --ovs-rm-orphans        Purge orphaned OVS ports 
                                Seen as 'no such device' error from following commands:
                                   'ovs-vsctl show'
                                   'obb -s | obb --show-config'

@@ -42,19 +42,36 @@
 #  (1) https://medium.com/@frontman/how-to-parse-yaml-string-via-command-line-374567512303
 #  (2) https://gist.github.com/pkuczynski/8665367
 #  (3) https://github.com/0k/shyaml
-#-------------------------------------------------------------------------------------------
+#################################################################################
+# Version
+hvi_VERSION=v00.21.a
+echo "
+ NOTICE: YOU ARE RUNNING A BETA PROJECT!
+ ContainerCraft.io ~~ ccio-hypervisor-install 
+ $hvi_VERSION
+"
 
 # Check if run as root!
 if [[ $EUID -ne 0 ]]; then
-        echo "$SEP_2 This script must be run as root!"
-	echo "$SEP_2 Exiting ... " 
+        echo "This script must be run as root!"
+	echo "Exiting ... " 
         exit 1
 fi
 
 #################################################################################
+# Debug Flag [true|false]
+print_DBG_FLAGS="true"
+# Debug output 
+print_dbg_flags () {
+if [ $print_DBG_FLAGS = "true" ]; then
+    echo "$dbg_FLAG"
+fi
+}
+
+#################################################################################
 # Configure and validate libvirt installation
 configure_libvirt () {
-echo "WARNING! All automated Libvirt configuration currently disabled!!!"
+dbg_FLAG="WARNING! All automated Libvirt configuration currently disabled!!!" && print_dbg_flags; 
 mkdir -p /etc/ccio/virsh_xml
 virt-host-validate
 }
@@ -70,7 +87,8 @@ LIBVIRT_PKGS="qemu \
 	          libvirt0 "
 EFI_PKGS="qemu-efi \
           ovmf"
-       apt install -y $LIBVIRT_PKGS #EFI_PKGS
+       apt install $LIBVIRT_PKGS #EFI_PKGS
+       #apt install -y $LIBVIRT_PKGS #EFI_PKGS
 echo "$SEP_2 Installed LibvirtD + KVM + QEMU Requirements!"
 }
 
@@ -129,14 +147,15 @@ zpool_NAME="default"
 zpool_TYPE="zfs"
 echo "[f24.0s] Preping host for LXD configuration"
 echo "[f24.1r] CCIO_Setup is about to purge any zfs pools and lxd storage"
-echo "         matching the name $zpool_NAME"
-if [ $(zpool list $zpool_NAME; echo $?) = "0" ] && \
-   [ $(zpool list $zpool_NAME; echo $?) = "0" ]; then 
+echo "         matching the name \"$zpool_NAME\""
+if [ $(zpool list $zpool_NAME; echo $?) = "0" ]; then 
    echo "No pre-existing storage pools found matching $zpool_NAME"
 else
-    echo "$SEP_2 Showing pool information"
+    echo "$SEP_2 Showing pool information
+    "
     zpool list $zpool_NAME
     lxc storage list | grep $zpool_NAME
+    echo ""
     while true; do
     read -p "Are you sure $zpool_NAME is safe to erase?" yn
         case $yn in
@@ -223,17 +242,21 @@ echo "$SEP_2 Installed LXD requirements successfully!"
 #################################################################################
 # Install LXD Packages from SNAP
 install_lxd_snap () {
-    apt purge lxd lxd-client
+    apt purge lxd lxd-client -y
     apt install -y zfsutils-linux squashfuse
-    snap install lxd
+    snap install lxd --edge
 }
 
 #################################################################################
 # Prompt for lxd install source from either Legacy PPA or SNAP package
 check_install_source_lxd () {
 PS3="
-      Please note that the SNAP package is recommended while the 
-      PPA install source is required for the CRIU live migration feature
+      CAUTION, this will remove any existing versions of LXD!
+
+      Please note that the SNAP package is HIGHLY recommended! 
+
+      Only use the PPA Install option if you know what you are doing.
+      PPA installation is required for the CRIU live migration feature.
 
 Select: "
 echo "
@@ -268,20 +291,20 @@ done
 # configure system for OVS
 # If supported & user approves, enable dpdk
 configure_openvswitch () {
-echo "[f22.0s] Configuring Host for OpenVSwitch with DPDK Enablement"
-echo "[f22.1r]"
-	update-alternatives --set \
-        ovs-vswitchd /usr/lib/openvswitch-switch-dpdk/ovs-vswitchd-dpdk
-echo "[f22.2r]"
+dbg_FLAG="[f22.0s]" && print_dbg_flags; 
+#dbg_FLAG="[f22.1r] Configuring Host for OpenVSwitch with DPDK Enablement" && print_dbg_flags; 
+#	update-alternatives --set \
+#        ovs-vswitchd /usr/lib/openvswitch-switch-dpdk/ovs-vswitchd-dpdk
+dbg_FLAG="[f22.2r]" && print_dbg_flags; 
 	systemctl restart openvswitch-switch.service
 	systemctl enable openvswitch-switch.service
-echo "$SEP_2 Done"
+dbg_FLAG="Done" && print_dbg_flags; 
 }
 
 #################################################################################
 # Install OpenVSwitch Packages
 install_openvswitch () {
-echo "[f21.0s] Installing OpenVSwitch Components"
+dbg_FLAG="[f21.0s] Installing OpenVSwitch Components" && print_dbg_flags; 
 OVS_PKGS="openvswitch-common \
           openvswitch-switch"
 OVS_DPDK_PKGS="dkms \
@@ -337,28 +360,28 @@ check_LIBVIRT_IS_INSTALLED=$(command -v libvirtd >/dev/null; echo $? )
 check_LXD_IS_INSTALLED="1"
 #check_LXD_IS_INSTALLED=$(command -v lxd >/dev/null; echo $? )
 
-echo "running updates ..."
+dbg_FLAG="running updates ..." && print_dbg_flags; 
 apt_udpate
 apt_upgrade
 
 echo "is ovs installed, .... checking"
 echo "$check_OVS_IS_INSTALLED"
 if [ $check_OVS_IS_INSTALLED != "0" ]; then
-    echo "installing openvswitch"
+    dbg_FLAG="installing openvswitch" && print_dbg_flags; 
     install_openvswitch
-    echo "configuring openvswitch"
+    dbg_FLAG="configuring openvswitch" && print_dbg_flags; 
     configure_openvswitch 
 fi
 echo "is lxd installed, .... checking"
 if [ $check_LXD_IS_INSTALLED != "0" ]; then
-    echo "installing lxd"
+    dbg_FLAG="installing lxd" && print_dbg_flags; 
     check_install_source_lxd 
-    echo "configuring lxd"
+    dbg_FLAG="configuring lxd" && print_dbg_flags; 
     configure_lxd_daemon 
 fi
 echo "is libvirt installed, .... checking"
 if [ $check_LIBVIRT_IS_INSTALLED != "0" ]; then
-    echo "installing libvirt+qemu+kvm"
+    dbg_FLAG="installing libvirt+qemu+kvm" && print_dbg_flags; 
     check_host_virt_support
     configure_libvirt 
 fi
