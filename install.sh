@@ -148,7 +148,7 @@ mkdir -p /etc/ccio/tools
 
 purge_legacy_lxd () {
 echo "purging legacy LXD .deb installations"
-apt-get purge lxd lxd-client
+apt-get purge lxd lxd-client -y
 }
 
 purge_legacy_lxd 
