@@ -56,7 +56,7 @@ if [[ $ovs_SVC_CHECK_SUCCESS -ne "0" ]]; then
 fi
 
 # Determine host system's service names for LibVirt
-libvirt_SVC_NAME_CHECK=$(systemctl list-unit-files | grep -E "libvirt.service")
+libvirt_SVC_NAME_CHECK=$(systemctl list-unit-files | grep -E "libvirtd.service")
 libvirt_SVC_CHECK_SUCCESS="$?"
 if [[ $libvirt_SVC_CHECK_SUCCESS -ne "0" ]]; then
     libvirt_SVC_NAME_CHECK="DISABLED"
@@ -146,6 +146,8 @@ echo "Seeding CCIO file system ..."
 mkdir -p /etc/ccio/tools
 }
 
+#################################################################################
+# 
 purge_legacy_lxd () {
 echo "purging legacy LXD .deb installations"
 apt-get purge lxd lxd-client -y
