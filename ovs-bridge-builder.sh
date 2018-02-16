@@ -842,7 +842,7 @@ fi
 
 # If Libvirtd Service is not active, error & attempt to start service
 if [ "$libvirt_SERVICE_STATUS" != "active" ]; then
-    dead_SERVICE_NAME="libvirt_SERVICE_NAME"
+    dead_SERVICE_NAME="$libvirt_SERVICE_NAME"
     dbg_FLAG="[h03.3r] > WARN: Dead Service Found  =  $dead_SERVICE_NAME"
     echo " > ERROR: The LibVirtD System Service IS NOT RUNNING"
     echo " > Attempting to start $dead_SERVICE_NAME"
