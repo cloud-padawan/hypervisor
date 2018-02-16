@@ -85,9 +85,9 @@ LIBVIRT_PKGS="qemu \
 	          qemu-utils \
 	          libvirt-bin \
 	          libvirt0 "
-EFI_PKGS="qemu-efi \
-          ovmf"
-       apt install $LIBVIRT_PKGS #EFI_PKGS
+#EFI_PKGS="qemu-efi \
+#          ovmf"
+       apt install "$LIBVIRT_PKGS" #EFI_PKGS
        #apt install -y $LIBVIRT_PKGS #EFI_PKGS
 echo "$SEP_2 Installed LibvirtD + KVM + QEMU Requirements!"
 }
@@ -95,7 +95,7 @@ echo "$SEP_2 Installed LibvirtD + KVM + QEMU Requirements!"
 #################################################################################
 prompt_libvirt_install () {
 while true; do
-   	read -p "$SEP_2 Do you want to continue installation?" yn
+   	read -rp "$SEP_2 Do you want to continue installation?" yn
    	case $yn in
    		[Yy]* ) echo "$SEP_2 Continuing ..." ; 
             libvirt_install
@@ -117,12 +117,12 @@ echo "[f10.0e]"
 #   EG: VT-d or AMD-V 
 check_host_virt_support () {
 echo "[f10.0b]"
-check_HOST_VIRT_EXT=$(egrep -c '(vmx|svm)' /proc/cpuinfo)
-if [ $check_HOST_VIRT_EXT != "0" ]; then
+check_HOST_VIRT_EXT=$(grep -E '(vmx|svm)' /proc/cpuinfo)
+if [ "$check_HOST_VIRT_EXT" != "0" ]; then
     echo "[f10.1r]"
 	echo "$SEP_2 System passed host virtual extension support check"
     install_libvirt
-elif [ $check_HOST_VIRT_EXT != "0" ]; then
+elif [ "$check_HOST_VIRT_EXT" != "0" ]; then
     echo "[f10.2r]"
 	echo "$SEP_2 ERROR: Host did not pass virtual extension support check!"
 	echo "       $SEP_2 This means that your hardware either does not support"
@@ -148,7 +148,7 @@ zpool_TYPE="zfs"
 echo "[f24.0s] Preping host for LXD configuration"
 echo "[f24.1r] CCIO_Setup is about to purge any zfs pools and lxd storage"
 echo "         matching the name \"$zpool_NAME\""
-if [ $(zpool list $zpool_NAME; echo $?) = "0" ]; then 
+if [ "$(zpool list $zpool_NAME; echo $?)" = "0" ]; then 
    echo "No pre-existing storage pools found matching $zpool_NAME"
 else
     echo "$SEP_2 Showing pool information
@@ -157,7 +157,7 @@ else
     #lxc storage list | grep $zpool_NAME
     echo ""
     while true; do
-    read -p "Are you sure $zpool_NAME is safe to erase?" yn
+    read -rp "Are you sure $zpool_NAME is safe to erase?" yn
         case $yn in
             [Yy]* ) 
                 echo "Purging $zpool_NAME ...." ; 
@@ -183,7 +183,7 @@ check_safety_zpool_delete
     zpool destroy -f $zpool_NAME
     lxc storage delete $zpool_NAME
     lxc storage create $zpool_NAME $zpool_TYPE
-stty -echo; read -p "Please Create a Password for your LXD Daemon: " PASSWD; echo
+stty -echo; read -rp "Please Create a Password for your LXD Daemon: " PASSWD; echo
 stty echo
 cat <<EOF | lxd init --preseed 
 echo "[f24.3r] Configuring LXD init with preseed data"
@@ -313,7 +313,7 @@ OVS_DPDK_PKGS="dkms \
 	       dpdk-dev \
            openvswitch-switch-dpdk"
 
-	apt install -y $OVS_PKGS $OVS_DPDK_PKGS
+	apt install -y "$OVS_PKGS""$OVS_DPDK_PKGS"
 }
 
 #################################################################################
@@ -367,7 +367,7 @@ apt_upgrade
 
 echo "is ovs installed, .... checking"
 echo "$check_OVS_IS_INSTALLED"
-if [ $check_OVS_IS_INSTALLED != "0" ]; then
+if [ "$check_OVS_IS_INSTALLED" != "0" ]; then
     dbg_FLAG="installing openvswitch" && print_dbg_flags; 
     install_openvswitch
     dbg_FLAG="configuring openvswitch" && print_dbg_flags; 
@@ -381,14 +381,14 @@ if [ $check_LXD_IS_INSTALLED != "0" ]; then
     configure_lxd_daemon 
 fi
 echo "is libvirt installed, .... checking"
-if [ $check_LIBVIRT_IS_INSTALLED != "0" ]; then
+if [ "$check_LIBVIRT_IS_INSTALLED" != "0" ]; then
     dbg_FLAG="installing libvirt+qemu+kvm" && print_dbg_flags; 
     check_host_virt_support
     configure_libvirt 
 fi
-if [ $check_LIBVIRT_IS_INSTALLED = "0" ] && \
-   [ $check_LXD_IS_INSTALLED = "0" ]     && \
-   [ $check_OVS_IS_INSTALLED = "0" ]; then
+if [ "$check_LIBVIRT_IS_INSTALLED" = "0" ] && \
+   [ "$check_LXD_IS_INSTALLED" = "0" ]     && \
+   [ "$check_OVS_IS_INSTALLED" = "0" ]; then
    echo "All services are already installed"
    exit 1
 fi
