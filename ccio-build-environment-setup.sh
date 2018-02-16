@@ -80,14 +80,10 @@ virt-host-validate
 # install Libvirt | KVM | QEMU packages
 install_libvirt () {
 echo "[f25.0s] Installing Libvirt packages"
-LIBVIRT_PKGS="qemu \
-              qemu-kvm \
-	          qemu-utils \
-	          libvirt-bin \
-	          libvirt0 "
+LIBVIRT_PKGS="qemu qemu-kvm qemu-utils libvirt-bin libvirt0"
 #EFI_PKGS="qemu-efi \
 #          ovmf"
-       apt install "$LIBVIRT_PKGS" #EFI_PKGS
+       apt install $LIBVIRT_PKGS
        #apt install -y $LIBVIRT_PKGS #EFI_PKGS
 echo "$SEP_2 Installed LibvirtD + KVM + QEMU Requirements!"
 }
@@ -306,14 +302,10 @@ dbg_FLAG="Done" && print_dbg_flags;
 # Install OpenVSwitch Packages
 install_openvswitch () {
 dbg_FLAG="[f21.0s] Installing OpenVSwitch Components" && print_dbg_flags; 
-OVS_PKGS="openvswitch-common \
-          openvswitch-switch"
-OVS_DPDK_PKGS="dkms \
-               dpdk \
-	       dpdk-dev \
-           openvswitch-switch-dpdk"
+OVS_PKGS="openvswitch-common openvswitch-switch"
+OVS_DPDK_PKGS="dkms dpdk dpdk-dev openvswitch-switch-dpdk"
 
-	apt install -y "$OVS_PKGS""$OVS_DPDK_PKGS"
+	apt install -y $OVS_PKGS $OVS_DPDK_PKGS
 }
 
 #################################################################################

@@ -24,7 +24,6 @@ echo "
        $ sudo ccio-install
        
        "
-exit 0
 }
 
 #################################################################################
@@ -149,7 +148,7 @@ mkdir -p /etc/ccio/tools
 #################################################################################
 # 
 purge_legacy_lxd () {
-echo "purging legacy LXD .deb installations"
+echo ">> >> purging legacy LXD .deb installations"
 apt-get purge lxd lxd-client -y
 }
 
