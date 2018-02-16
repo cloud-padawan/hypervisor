@@ -1,3 +1,4 @@
+#!/bin/bash
 # Install ccio-utils
 
 # Set URL's
@@ -33,7 +34,8 @@ echo "Checking service names ..."
 
 # Determine host system's service names for LXD
 lxd_SVC_NAME_CHECK=$(systemctl list-unit-files | grep -E "lxd.service|snap.lxd.daemon.service")
-if [[ $? -ne "0" ]]; then
+lxd_SVC_CHECK_SUCCESS="$?"
+if [[ $lxd_SVC_CHECK_SUCCESS -ne "0" ]]; then
     lxd_SVC_NAME_CHECK="DISABLED"
     echo "OVS Service Not Found!"
     echo "LXD Service: lxd_SVC_NAME_CHECK"
@@ -44,7 +46,8 @@ fi
 # Determine host system's service names for OVS
 ovs_SVC_NAME_CHECK=$(systemctl list-unit-files \
                     | grep -E "ovs-vswitchd.service|openvswitch-switch.service")
-if [[ $? -ne "0" ]]; then
+ovs_SVC_CHECK_SUCCESS="$?"
+if [[ $ovs_SVC_CHECK_SUCCESS -ne "0" ]]; then
     ovs_SVC_NAME_CHECK="DISABLED"
     echo "OVS Service Not Found!"
     echo "OVS Service: ovs_SVC_NAME_CHECK"
@@ -54,7 +57,8 @@ fi
 
 # Determine host system's service names for LibVirt
 libvirt_SVC_NAME_CHECK=$(systemctl list-unit-files | grep -E "libvirt.service")
-if [[ $? -ne "0" ]]; then
+libvirt_SVC_CHECK_SUCCESS="$?"
+if [[ $libvirt_SVC_CHECK_SUCCESS -ne "0" ]]; then
     libvirt_SVC_NAME_CHECK="DISABLED"
     echo "Libvirt Service Not Found!"
     echo "KVM Service: $libvirt_SVC_NAME_CHECK"
