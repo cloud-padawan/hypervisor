@@ -24,6 +24,7 @@ echo "
        $ sudo ccio-install
        
        "
+exit 0
 }
 
 #################################################################################
@@ -32,7 +33,9 @@ seed_ccio_conf () {
 echo "Checking service names ..."
 
 # Determine host system's service names for LXD
-lxd_SVC_NAME_CHECK=$(systemctl list-unit-files | grep -E "lxd.service|snap.lxd.daemon.service")
+lxd_SVC_NAME_CHECK=$(systemctl list-unit-files \
+                    | grep -E "lxd.service|snap.lxd.daemon.service" \
+                    | awk '{print $1}')
 lxd_SVC_CHECK_SUCCESS="$?"
 if [[ $lxd_SVC_CHECK_SUCCESS -ne "0" ]]; then
     lxd_SVC_NAME_CHECK="DISABLED"
@@ -44,7 +47,8 @@ fi
 
 # Determine host system's service names for OVS
 ovs_SVC_NAME_CHECK=$(systemctl list-unit-files \
-                    | grep -E "ovs-vswitchd.service|openvswitch-switch.service")
+                    | grep -E "ovs-vswitchd.service|openvswitch-switch.service" \
+                    | awk '{print $1}')
 ovs_SVC_CHECK_SUCCESS="$?"
 if [[ $ovs_SVC_CHECK_SUCCESS -ne "0" ]]; then
     ovs_SVC_NAME_CHECK="DISABLED"
@@ -55,7 +59,9 @@ if [[ $ovs_SVC_CHECK_SUCCESS -ne "0" ]]; then
 fi
 
 # Determine host system's service names for LibVirt
-libvirt_SVC_NAME_CHECK=$(systemctl list-unit-files | grep -E "libvirtd.service")
+libvirt_SVC_NAME_CHECK=$(systemctl list-unit-files \
+                        | grep -E "libvirtd.service" \
+                        | awk '{print $1}')
 libvirt_SVC_CHECK_SUCCESS="$?"
 if [[ $libvirt_SVC_CHECK_SUCCESS -ne "0" ]]; then
     libvirt_SVC_NAME_CHECK="DISABLED"
@@ -148,7 +154,7 @@ mkdir -p /etc/ccio/tools
 #################################################################################
 # 
 purge_legacy_lxd () {
-echo ">> >> purging legacy LXD .deb installations"
+echo "purging legacy LXD .deb installations"
 apt-get purge lxd lxd-client -y
 }
 
