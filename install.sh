@@ -146,6 +146,12 @@ echo "Seeding CCIO file system ..."
 mkdir -p /etc/ccio/tools
 }
 
+purge_legacy_lxd () {
+echo "purging legacy LXD .deb installations"
+apt-get purge lxd lxd-client
+}
+
+purge_legacy_lxd 
 seed_ccio_filesystem
 download_virt_requirements
 install_obb
