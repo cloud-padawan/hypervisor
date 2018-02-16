@@ -1,5 +1,9 @@
 # Install ccio-utils
 
+# Set URL's
+url_OBB="https://raw.githubusercontent.com/containercraft/hypervisor/master/ovs-bridge-builder.sh"
+virt_BUILD_ENV_URL="https://raw.githubusercontent.com/containercraft/hypervisor/master/ccio-build-environment-setup.sh"
+
 # Check if run as root!
 if [[ $EUID -ne 0 ]]; then
         echo "$SEP_2 This script must be run as root!"
@@ -7,12 +11,9 @@ if [[ $EUID -ne 0 ]]; then
         exit 1
 fi
 
-
 #################################################################################
-install_virt_requirements () {
-rm /usr/bin/ccio-install
-ln -s /etc/ccio/tools/ccio-build-environment-setup.sh /usr/bin/ccio-install
-
+# End Script & Echo Install command 
+end_script_echo () {
 echo "
 
    Thank you for downloading CCIO utils. 
@@ -26,43 +27,47 @@ exit 0
 }
 
 #################################################################################
-# Download and install obb tool
-install_obb () {
-url_OBB="https://raw.githubusercontent.com/containercraft/hypervisor/master/ovs-bridge-builder.sh"
-
-echo "Installing OVS_Bridge_Builder"
-wget -O /etc/ccio/tools/obb.sh $url_OBB
-chmod +x /etc/ccio/tools/obb.sh
-rm /usr/bin/obb
-ln -s /etc/ccio/tools/obb.sh /usr/bin/obb
-}
-
-#################################################################################
-# Download virt setup installer
-download_virt_requirements () {
-virt_BUILD_ENV_URL="https://raw.githubusercontent.com/containercraft/hypervisor/master/ccio-build-environment-setup.sh"
-
-wget -O /etc/ccio/tools/ccio-build-environment-setup.sh $virt_BUILD_ENV_URL
-chmod +x /etc/ccio/tools/ccio-build-environment-setup.sh
-}
-
-#################################################################################
-# Create CCIO Configuration File
-seed_ccio_filesystem () {
-
-# Create ccio directorys
-echo "Seeding CCIO file system ..."
-mkdir -p /etc/ccio/tools
-
-# Determine host system's service names for ovs/libvirt/lxd
+# Write ccio.conf
+seed_ccio_conf () {
 echo "Checking service names ..."
-lxd_SVC_NAME_CHECK=$(systemctl list-unit-files \
-                    | grep -E "lxd.service|snap.lxd.daemon.service")
+
+# Determine host system's service names for LXD
+lxd_SVC_NAME_CHECK=$(systemctl list-unit-files | grep -E "lxd.service|snap.lxd.daemon.service")
+if [[ $? -ne "0" ]]; then
+    lxd_SVC_NAME_CHECK="DISABLED"
+    echo "OVS Service Not Found!"
+    echo "LXD Service: lxd_SVC_NAME_CHECK"
+ else
+    echo "LXD Service: lxd_SVC_NAME_CHECK"
+fi
+
+# Determine host system's service names for OVS
 ovs_SVC_NAME_CHECK=$(systemctl list-unit-files \
                     | grep -E "ovs-vswitchd.service|openvswitch-switch.service")
-libvirt_SVC_NAME_CHECK=$(systemctl list-unit-files \
-                    | grep -E "libvirt.service")
+if [[ $? -ne "0" ]]; then
+    ovs_SVC_NAME_CHECK="DISABLED"
+    echo "OVS Service Not Found!"
+    echo "OVS Service: ovs_SVC_NAME_CHECK"
+ else
+    echo "OVS Service: ovs_SVC_NAME_CHECK"
+fi
 
+# Determine host system's service names for LibVirt
+libvirt_SVC_NAME_CHECK=$(systemctl list-unit-files | grep -E "libvirt.service")
+if [[ $? -ne "0" ]]; then
+    libvirt_SVC_NAME_CHECK="DISABLED"
+    echo "Libvirt Service Not Found!"
+    echo "KVM Service: $libvirt_SVC_NAME_CHECK"
+ else
+    echo "KVM Service: $libvirt_SVC_NAME_CHECK"
+fi
+
+echo "
+LXD Service: $lxd_SVC_NAME_CHECK
+OVS Service: $ovs_SVC_NAME_CHECK
+KVM Service: $libvirt_SVC_NAME_CHECK
+"
+         
 # Write ccio.conf
 default_BR_NAME="ovsbr01"
 echo "Writing ccio.conf ..."
@@ -82,15 +87,18 @@ cat >/etc/ccio/ccio.conf <<EOF
 dbg_BREAK="true"
 print_DBG_FLAGS="true"
 
+# Host System Service Names
+# Will be disabled at install time if service is not installed on host
+ovs_SERVICE_NAME="$ovs_SVC_NAME_CHECK"
+lxd_SERVICE_NAME="$lxd_SVC_NAME_CHECK"
+libvirt_SERVICE_NAME="$libvirt_SVC_NAME_CHECK"
+
 # Default Run Values
 xml_FILE_DIR="/etc/ccio/virsh_xml"
 show_HELP="false"
 show_HELP_LONG="false"
 show_HEALTH="false"
 show_CONFIG="false"
-ovs_SERVICE_NAME="$ovs_SVC_NAME"
-lxd_SERVICE_NAME="$lxd_SVC_NAME_CHECK"
-libvirt_SERVICE_NAME="$libvirt_SVC_NAME_CHECK"
 ovs_BR_DRIVER="openvswitch"
 lxd_CMD="lxc"
 purge_DEAD_OVS_PORTS="false"
@@ -107,7 +115,35 @@ dbg_FLAG="[d00.0b] > Imported ccio.conf" && print_dbg_flags;
 EOF
 }
 
+#################################################################################
+# Download and install obb tool
+install_obb () {
+rm /usr/bin/obb
+echo "Installing OVS_Bridge_Builder"
+wget -O /etc/ccio/tools/obb.sh $url_OBB
+chmod +x /etc/ccio/tools/obb.sh
+ln -s /etc/ccio/tools/obb.sh /usr/bin/obb
+}
+
+#################################################################################
+# Download virt setup installer
+download_virt_requirements () {
+rm /usr/bin/ccio-install
+echo "Preparing ccio-install utility"
+wget -O /etc/ccio/tools/ccio-build-environment-setup.sh $virt_BUILD_ENV_URL
+chmod +x /etc/ccio/tools/ccio-build-environment-setup.sh
+ln -s /etc/ccio/tools/ccio-build-environment-setup.sh /usr/bin/ccio-install
+}
+
+#################################################################################
+# Create CCIO File System
+seed_ccio_filesystem () {
+echo "Seeding CCIO file system ..."
+mkdir -p /etc/ccio/tools
+}
+
 seed_ccio_filesystem
 download_virt_requirements
 install_obb
-install_virt_requirements
+seed_ccio_conf 
+end_script_echo
