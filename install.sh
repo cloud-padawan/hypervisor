@@ -38,9 +38,9 @@ lxd_SVC_CHECK_SUCCESS="$?"
 if [[ $lxd_SVC_CHECK_SUCCESS -ne "0" ]]; then
     lxd_SVC_NAME_CHECK="DISABLED"
     echo "OVS Service Not Found!"
-    echo "LXD Service: lxd_SVC_NAME_CHECK"
+    echo "LXD Service: $lxd_SVC_NAME_CHECK"
  else
-    echo "LXD Service: lxd_SVC_NAME_CHECK"
+    echo "LXD Service: $lxd_SVC_NAME_CHECK"
 fi
 
 # Determine host system's service names for OVS
@@ -50,9 +50,9 @@ ovs_SVC_CHECK_SUCCESS="$?"
 if [[ $ovs_SVC_CHECK_SUCCESS -ne "0" ]]; then
     ovs_SVC_NAME_CHECK="DISABLED"
     echo "OVS Service Not Found!"
-    echo "OVS Service: ovs_SVC_NAME_CHECK"
+    echo "OVS Service: $ovs_SVC_NAME_CHECK"
  else
-    echo "OVS Service: ovs_SVC_NAME_CHECK"
+    echo "OVS Service: $ovs_SVC_NAME_CHECK"
 fi
 
 # Determine host system's service names for LibVirt
