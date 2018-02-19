@@ -7,6 +7,9 @@
 # Also requires that zfsutils-linux package be installed for LXD or that you
 # manually create a "default" storage pool for LXD instead
 # 
+# Default install:
+#  Located in /etc/ccio/tools/obb.sh
+#  Linked at /usr/bin/obb
 #################################################################################
 # TODO BUG FIX LIST
 #
