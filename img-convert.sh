@@ -47,11 +47,12 @@ discard_DIR=/tmp/libvirt/images/
 
 # Enable or disable compression during qcow2 conversion to save additional space
 # Notice: takes longer and has slight impact on performance
-if [[ $compress_SWITCH = "true" ]]; then
-    compress_IMG="-c"
-elif [[ $compress_SWITCH = "false" ]]; then
-    compress_IMG=""
-fi
+[[ $compress_SWITCH ]] && compress_IMG="-c" || compress_IMG=""
+#if [[ $compress_SWITCH = "true" ]]; then
+#    compress_IMG="-c"
+#elif [[ $compress_SWITCH = "false" ]]; then
+#    compress_IMG=""
+#fi
 
 #################################################################################
 # Replace original disk image with new qcow2 format
@@ -73,10 +74,16 @@ image_replace () {
 # Perform disk image file conversion
 image_convert () {
     echo " Converting $disk"
-		qemu-img convert -p $img_INPUT_TYPE -O qcow2 $compress_IMG $disk $disk.tmp
+		qemu-img convert \
+            -p $img_INPUT_TYPE \
+            -O qcow2 $compress_IMG $disk $disk.$temp_STAMP
         echo "qcow2 conversion complete for $disk"
 }
 
+# Generate unique hash for temp file naming
+gen_hash () {
+    temp_STAMP=$(date -u +"%Y-%m-%dT%H:%M:%S.%N+00:00" | md5sum)
+}
 #################################################################################
 # Find disk images
 image_find () {
@@ -114,6 +121,7 @@ virsh_LIST_DOM=$(virsh list --name --all)
                     echo ">>   Found RAW disk image file $disk"
                     echo ">>   Converting to qcow2 format..."
                     img_INPUT_TYPE="-f raw"
+                    gen_hash
                     image_convert
                     image_replace
                 elif [[ $image_TYPE_CHECK = "qcow2" ]] && \
@@ -121,6 +129,7 @@ virsh_LIST_DOM=$(virsh list --name --all)
                     echo ">>   Found QCOW2 disk image file $disk"
                     echo ">>   Compressing with qcow2 format..."
                     img_INPUT_TYPE=""
+                    gen_hash
                     image_convert
                     image_replace
                 fi
