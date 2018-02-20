@@ -73,7 +73,7 @@ image_replace () {
 # Perform disk image file conversion
 image_convert () {
     echo " Converting $disk"
-		qemu-img convert -p $img_INTPUT_TYPE -O qcow2 $compress_IMG $disk $disk.tmp
+		qemu-img convert -p $img_INPUT_TYPE -O qcow2 $compress_IMG $disk $disk.tmp
         echo "qcow2 conversion complete for $disk"
 }
 
