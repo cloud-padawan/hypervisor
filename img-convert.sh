@@ -1,11 +1,10 @@
 #!/bin/bash
 
-# libvirt guest backup routine
-# 1. snapshot qcow2 image
-# 2. export snapshot as indepentent disk
-# 3. Copy to backup storage location
-#    3.a compress with pixz
-#    3.b move to destination storage location
+# libvirt guest disk image file squashifier
+# 1. Convert [raw|qcow2] disk image files to compressed qcow2 images
+# 2. Backup or discard original disk images
+# 3. Replace disk images with new compressed qcow2 image
+#
 # Usage:
 #        img-convert
 # TODO:
