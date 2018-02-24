@@ -7,42 +7,39 @@
 # Also requires that zfsutils-linux package be installed for LXD or that you
 # manually create a "default" storage pool for LXD instead
 # 
-# Default install:
-#  Located in /etc/ccio/tools/obb.sh
-#  Linked at /usr/bin/obb
-#
 #################################################################################
-# TODO - BUG FIX LIST
-# OVS|LXD|LIBVIRTD Service Names not populated in ccio.conf (on Ubuntu Zesty)
-# lxd_CMD="lxc" on snap install (17.10)
-# - lxd.lxc --version | lxc --version == "command not found"
+# TODO BUG FIX LIST
 #
-# TODO - FEATURE REQUEST LIST
+# FIX: command line issue where short flag is recognized but long flags do not
+# work.
+#
+# TODO FEATURE REQUEST LIST
+# 
 # Add logging function
-# Add Better Error handling & Detection
-# Enable simple "--del-port" function
-# - Function already present for --add-port, requires breakout run independently
-# Add [VLAN|GRE|Static_IP] IFACE Configuration as options
 # Add support for LXD+MAAS Integration
 # - https://github.com/lxc/lxd/blob/master/doc/containers.md (MAAS Integration)
-# Add Verbose/Quiet run option
-# Improve multi-distribution support
-# - Started in release v0.87.a
-# - Roadmap:
-# - - Arch Linux
-# - - Fedora
-# - - CentOS
-# - - RHEL
-# - - Alpine Linux
+# Add support for LXD Snap "lxc/lxd.lxc commands" = Should be complete
+# Add GRE IFACE Configuration as optional function
+# Add Better Error handling & Detection
+# Add "--del-port" function
+# Add package/dependency install function
+# - This is partially complete in the form of a helper "install.sh" script
+# Add function to create local LXD Firewall/Gateway Container
+# - This will be built in the ccio-utils package
+# Add support for other LXD storage configuration options during profile creation
+# - negative; this will occur in the ccio-utils package
+# Enable multi-distribution detection & setting of service unit name congruence
+# - added in release v0.87.a
 # Add support for Ubuntu Core OS
-# Add new testing script that automates testing of all documented commands 
+# Add Verbose/Quiet run option
+# Add new testing script that automates all documented commands 
 #
 # Review & research:
 # - https://github.com/yeasy/easyOVS
-#
 #################################################################################
+
 # Version
-obb_VERSION=v00.27.b
+obb_VERSION=v00.13.b
 echo "
  NOTICE: YOU ARE RUNNING A BETA PROJECT!
  ContainerCraft.io ~~ OVS-BridgeBuilder 
@@ -71,10 +68,9 @@ fi
 # Load Bridge-Builder Default Variables 
 # Used unless otherwise set by flags at run-time
 # Check for host ccio.conf configuration
-dbg_FLAG="[d00.0b] > Looking for ccio.conf" && print_dbg_flags; 
+dbg_FLAG="[d00.0b] > Looking for ccio.conf " && print_dbg_flags; 
 if [ -f /etc/ccio/ccio.conf ]; then
-    dbg_FLAG="[d00.0r] > Detected ccio.conf, loading configuration ..." \
-        && print_dbg_flags; 
+    dbg_FLAG="[d00.0r] > Detected ccio.conf, loading configuration ..." && print_dbg_flags; 
     source /etc/ccio/ccio.conf
 fi
 if [ ! -f /etc/ccio/ccio.conf ]; then
@@ -98,8 +94,7 @@ fi
 dbg_FLAG="[d00.2r] > Enabling Command Line Options" && print_dbg_flags; 
 OPTS=`getopt \
     -o bpdsHhz: \
-    --long \
-    add-bridge,add-port,del-br,ovs-rm-orphans,show-config,show-health,help,zee: \
+    --long add-bridge,add-port,del-br,ovs-rm-orphans,show-config,show-health,help,zee: \
     -n 'parse-options' -- "$@"`
 
 # Fail if options are not sane
@@ -109,9 +104,11 @@ if [ $? != 0 ] ;
     exit 1
 fi
 
-# Parse variables
-dbg_FLAG="[d00.4r] > Parsing Command Line Options" && print_dbg_flags; 
 eval set -- "$OPTS"
+
+# Parse variables
+
+dbg_FLAG="[d00.4r] > Parsing Command Line Options" && print_dbg_flags; 
 while true; do
     case "$1" in
         -h                ) 
@@ -143,7 +140,7 @@ while true; do
         -p | --add-port   ) 
             name_OVS_BR="$3"
             add_OVS_PORT="$4" 
-            lxd_CONT_NAME="$5" 
+            lxd_CONT_NAME="$5"; 
             shift; 
             shift;
             ;;
@@ -176,6 +173,7 @@ echo "       | | add_OVS_PORT     =  $add_OVS_PORT"
 echo "       | | del_OVS_PORT     =  $add_OVS_BR"
 echo "       | | lxd_CONT_NAME    =  $lxd_CONT_NAME"
 echo "       | | add_OVS_BR       =  $add_OVS_BR"
+echo "       | | del_OVS_BR   =  $del_OVS_BR"
 echo "[d01.0e]/"
 fi
 }
@@ -193,7 +191,7 @@ fi
 #################################################################################
 # Set LXD Daemon Key Values
 lxc_daemon_set () {
-    echo "Set LXD Daemon key to '$lxd_NEW_KEY_VAL'"
+    echo "Set LXD Daemon key to \"$lxd_NEW_KEY_VAL\""
     $lxd_CMD config set $key_lxd_SET
 }
 
@@ -266,7 +264,7 @@ lxd_cont_halt_check () {
 
     # Define lxc-wait command
     # Check status of container and set flag value
-    #lxc_WAIT="$lxd_CMD-wait"
+    lxc_WAIT="$lxd_CMD-wait"
     lxd_CONT_IS_STATE=$($lxd_CMD list \
         --format=csv -c n,s | grep $lxd_CONT_NAME | awk -F',' '{print $2}' )
 
@@ -279,15 +277,13 @@ lxd_cont_halt_check () {
 # If container is running, halt container with user permission or abort obb
 lxd_cont_halt_confirm () {
 if [ $lxd_CONT_IS_STATE = 'RUNNING' ]; then
-    # Echo current status
-    echo "LXD Container $lxd_CONT_NAME is currently running"
 
     # Confirm container shutdown 
     # If "Y" .. Stop Container
     # If "N" .. Abort Configuration
     echo "Container must be halted before continuing"
     while true; do
-        read -rp "Are you sure you want to power off $lxd_CONT_NAME ? " yn
+        read -p "Are you sure you want to power off $lxd_CONT_NAME ? " yn
         case $yn in
             [Yy]* ) echo "Confirmed ..... Powering off $lxd_CONT_NAME";
                 lxd_cont_halt
@@ -313,7 +309,7 @@ port_hwaddr_gen () {
         && print_dbg_flags; 
 
     # Collect input values
-    combined_HASH_INPUT="$name_OVS_BR$lxd_CONT_NAME$add_OVS_PORT"
+    combined_HASH_INPUT="$name_OVS_BR$lxd_CONTAINER_NAME$add_OVS_PORT"
 
     # Generate mac address
     # All OBB generated MAC addresses will start with "02"
@@ -454,7 +450,7 @@ check_DEFAULT_CONFIRM_2=" > Are you sure you want to continue building the $add_
 if [ $add_OVS_BR == $default_BR_NAME ]; then
     echo "$check_DEFAULT_CONFIRM_1"
     while true; do
-        read -rp " > $check_DEFAULT_CONFIRM_2" yn
+        read -p " > $check_DEFAULT_CONFIRM_2" yn
         case $yn in
             [Yy]* ) echo "Continuing ...."; 
                   break
@@ -487,12 +483,11 @@ auto $add_OVS_PORT
 iface $add_OVS_PORT inet dhcp
 EOF
 }
-
 #################################################################################
 # Create VIRSH Network XML Configuration File
 write_config_network_virsh () {
 
-    # Set VIRSH Working Variables
+    # Set VIRSH XML target file and directory
     virsh_XML_FILE="$add_OVS_BR.xml"
     virsh_XML_TARGET="$xml_FILE_DIR/$virsh_XML_FILE"
 
@@ -581,6 +576,9 @@ v6_DHCP="false"
 v4_ROUTE="false"
 v6_ROUTE="false"
 
+# Define Network Key Values
+# key_lxd_NETWORK_LIST="
+
 echo "[s0X.0s]"
 
 lxd_PROFILE_NAME="$add_OVS_BR"
@@ -599,13 +597,13 @@ lxd_PROFILE_NAME="$add_OVS_BR"
 add_ovs_bridge () {
 echo "[f03.0r]> Checking if OVS Bridge $add_OVS_BR already exists"
 ovs_br_check_if_exists 
-if [ $ovs_BR_IS_REAL != "0" ]; then
+if [ ovs_BR_IS_REAL != "0" ]; then
     echo "No bridge configured by this name, continuing ..."
-elif [ $ovs_BR_IS_REAL = "0" ]; then
+elif [ ovs_BR_IS_REAL = "0" ]; then
     echo "OVS Bridge $add_OVS_BR already configured on this host!"
     echo "To continue we will need to purge previous configuration!"
     while true; do
-        read -rp " > Are you sure you want to continue? " yn
+        read -p " > Are you sure you want to continue? " yn
         case $yn in
             [Yy]* ) echo "Confirmed! Continuing ...."; 
                   break

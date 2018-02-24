@@ -210,14 +210,17 @@ profiles:
       pool: default
       type: disk
 EOF
+unset PASSWD
 echo "Configured LXD successfully with preseed values"
 }
 
 #################################################################################
+# Prompt for lxd install source from either Legacy PPA or SNAP package
 # Install LXD Packages from PPA
 install_lxd_legacy_ppa () {
 echo "[f23.0s] Installing LXD from PPA"
     apt purge lxd lxd-client
+
     apt-add-repository ppa:ubuntu-lxc/stable -y
 	apt update
 	apt install -y -t xenial-backports \
@@ -238,7 +241,48 @@ echo "$SEP_2 Installed LXD requirements successfully!"
 #################################################################################
 # Install LXD Packages from SNAP
 install_lxd_snap () {
+# TODO: add migration support from ppa>snap
+PS3="
+      CAUTION, this is a DESTRUCTIVE ACTION!
+
+      DO NOT PROCEED UNLESS YOU UNDERSTAND THE CONSEQUENCES!
+
+      This installer was intended to be run on a clean install of Ubuntu.
+
+      Continuing will remove any legacy "lxd" & "lxd-client" .deb packages.
+      This does NOT affect the snap install of lxd. 
+      Once the ppa ".deb" packages have been removed you will not have access
+      to any previously created LXD containers.
+
+Select: "
+echo "
+      Are you sure you want to continue? 
+
+     "
+options=("Continue" "Cancel")
+select opt in "${options[@]}"; do
+    case $REPLY in
+        "Continue")
+            echo "Continuing LXD Installation ..."
+            ;;
+        "Cancel")
+            echo "Canceling due to user input"
+            echo "Exiting immidiately ..."
+            exit 1
+            ;;
+        *)
+            echo "$1 is not a valid option"
+            echo "Please type in: 'Continue' or 'Cancel'"
+            ;;
+    esac
+    break
+done
+
+    # Purge legacy lxd packages
     apt purge lxd lxd-client -y
+
+    # Install lxd
+    echo "[f22.0s] Installing LXD from SNAP"
     apt install -y zfsutils-linux squashfuse
     snap install lxd 
     snap refresh lxd --edge
