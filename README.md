@@ -9,6 +9,8 @@ Hypervisor configuration and management tools
 ````sh   
     sudo curl -L https://goo.gl/YPSs6k | bash
     sudo ccio-install                                                                                
+    sudo suermod -a -G lxd $USER_NAME
+    sudo suermod -a -G libvirt $USER_NAME
 ````    
 
   Then for usage

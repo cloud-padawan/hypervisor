@@ -305,8 +305,8 @@ ovs_iface_check_if_exists () {
 
     # Search for port by name on each bridge
     # Set variable with exit status of search command
-    for br in $(ovs-vsctl list-br); do 
-        ovs-vsctl list-ports $br | grep $add_OVS_PORT 
+    for br in $(sudo ovs-vsctl list-br); do 
+        sudo ovs-vsctl list-ports $br | grep $add_OVS_PORT 
         ovs_IFACE_IS_UNIQUE="$?"
     done
 
@@ -358,7 +358,7 @@ ovs_br_check_if_exists () {
 
     # Search for Bridge by Name
     # Set variable with exit status of search command
-    ovs-vsctl list-br | grep $name_OVS_BR 
+    sudo ovs-vsctl list-br | grep $name_OVS_BR 
     ovs_BR_IS_REAL="$?"
 
     # run_log 0 Search Complete
@@ -653,7 +653,7 @@ if  [ $lxd_CONT_NAME != "false" ] && \
     if [ $ovs_BR_IS_REAL != "0" ]; then
         run_log 0 "[f02.0x] > Unable to find $name_OVS_BR" 
         run_log 0 "[f02.0x] > Found the following bridge names:" 
-        ovs-vsctl list-br
+        sudo ovs-vsctl list-br
         run_log 0 "[f02.0x] Aborting due to error!"
         run_log 0 "[f02.0x] ERROR: Bridge Name Not Found!"
 
@@ -793,7 +793,7 @@ if [ $del_OVS_BR != "false" ]; then
 
     # Remove OVS Bridge
     run_log 0 "[f01.3r] > Purging OpenVswitch Configuration"
-    ovs-vsctl del-br $del_OVS_BR > /dev/null 2>&1  ;
+    sudo ovs-vsctl del-br $del_OVS_BR > /dev/null 2>&1  ;
 
     # Remove ifup file
     run_log 0 "[f01.4r] > Removing ifup $del_OVS_BR.cfg"
@@ -810,11 +810,11 @@ run_log 0 "[f01.0e] > Network Removal Complete for $del_OVS_BR ..."
 #################################################################################
 # Purge dead OVS Interfaces
 purge_dead_iface_all () {
-dead_OVS_IFACE=$(ovs-vsctl show | awk '$1 - /error:/{print $7;}')
+dead_OVS_IFACE=$(sudo ovs-vsctl show | awk '$1 - /error:/{print $7;}')
 
     run_log 0 "[h05.0b] > Purging On All OVS Bridges" 
     for iface in $dead_OVS_IFACE; do 
-        ovs-vsctl del-port $iface; 
+        sudo ovs-vsctl del-port $iface; 
         run_log 0 "[h05.0r] > Successfully removed $dead_OVS_IFACE" 
     done
 
@@ -895,7 +895,7 @@ if [ "$libvirt_SERVICE_STATUS" = "active" ] && \
     run_log 0 "[h04.2r] > OpenVSwitch Network Configuration" 
     run_log 0 "OpenVSwitch Network Configuration
     "
-    ovs-vsctl show
+    sudo ovs-vsctl show
 
     # List LXD Networks
     run_log 0 "[h04.3r] > LXD Network Configuration" 
@@ -997,7 +997,7 @@ run_log 0 "[h02.0e] > Print Long End"
 
 #################################################################################
 # Check if run as root!
-[[ $EUID -ne 0 ]] && run_log 1 "Must be run as root!"
+#[[ $EUID -ne 0 ]] && run_log 1 "Must be run as root!"
 
 #################################################################################
 # Start initial function that determines behavior from command line flags
