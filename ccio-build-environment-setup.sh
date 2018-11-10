@@ -112,7 +112,7 @@ virt_AMD=$(grep svm /proc/cpuinfo; echo $?)
 #################################################################################
 # install Libvirt | KVM | QEMU packages
 install_libvirt () {
-LIBVIRT_PKGS="qemu qemu-kvm qemu-utils libvirt0 libvirt-clients"
+LIBVIRT_PKGS="qemu qemu-kvm qemu-utils libvirt0 libvirt-clients libvirt-daemon"
 
     run_log 0 "Installing Libvirt packages"
 

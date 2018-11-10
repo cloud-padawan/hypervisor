@@ -16,8 +16,8 @@
 # from bottom to top. 
 
 # Debugging Switches
-  dbg_BREAK="true"
-  print_DBG_FLAGS="true"
+  dbg_BREAK="false"
+  print_DBG_FLAGS="false"
 # dbg_BREAK="false"
 # print_DBG_FLAGS="false"
 
