@@ -282,6 +282,7 @@ install_lxd_legacy_ppa () {
                       lxd-client \
                       lxd-tools \
                       lxc-common \
+                      lxc-utils \
                       lxcfs \
                       liblxc1 \
                       uidmap \

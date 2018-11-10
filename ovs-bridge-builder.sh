@@ -169,7 +169,7 @@ if [ $lxd_CONT_IS_STATE = "RUNNING" ]; then
     $lxd_CMD start $lxd_CONT_NAME
 
     # Re-Check Container State
-    $lxc_WAIT --name $lxd_CONT_NAME --state=RUNNING \
+    $lxc_WAIT --name $lxd_CONT_NAME --state=RUNNING --timeout=5 \
        && lxd_CONT_IS_STATE=$($lxd_CMD list --format=csv -c n,s \
                              | grep $lxd_CONT_NAME \
                              | awk -F',' '{print $2}') 
@@ -206,7 +206,7 @@ lxd_cont_halt_check () {
 
     # Define lxc-wait command
     # Check status of container and set flag value
-    #lxc_WAIT="$lxd_CMD-wait"
+    lxc_WAIT="lxc-wait"
     lxd_CONT_IS_STATE=$($lxd_CMD list \
         --format=csv -c n,s | grep $lxd_CONT_NAME | awk -F',' '{print $2}' )
 
@@ -259,12 +259,12 @@ port_hwaddr_gen () {
 
     # Generate mac address
     # All OBB generated MAC addresses will start with "02"
-    if [[ -z $lxd_CONT_NAME ]]; then
+    if [[ ! -z $lxd_CONT_NAME ]]; then
         port_IFACE_HWADDR=$( run_log 0 "$combined_HASH_INPUT" \
         | md5sum \
         | sed 's/^\(..\)\(..\)\(..\)\(..\)\(..\).*$/02:\1:\2:\3:\4:\5/')
 
-    elif [[ ! -z $lxd_CONT_NAME ]]; then
+    elif [[ -z $lxd_CONT_NAME ]]; then
         port_IFACE_HWADDR=$( run_log 0 "$combined_HASH_INPUT" \
         | md5sum \
         | sed 's/^\(..\)\(..\)\(..\)\(..\)\(..\).*$/02\\:\1\\:\2\\:\3\\:\4\\:\5/')
@@ -289,6 +289,7 @@ ovs_iface_check_if_exists () {
     for br in $(ovs-vsctl list-br); do 
         ovs-vsctl list-ports $br | grep $add_OVS_PORT 
         ovs_IFACE_IS_UNIQUE="$?"
+    done
 
     # run_log 0 Search Complete
     run_log 0 "[s04.0s] > STAT: Interface Search Exit Code: $ovs_IFACE_IS_UNIQUE"\
@@ -300,7 +301,6 @@ ovs_iface_check_if_exists () {
         elif [ $ovs_IFACE_IS_UNIQUE != "0" ]; then 
             run_log 0 "[s04.1x] > WARN: No Port Name $add_OVS_PORT found on this host."
         fi
-    done
 }
 
 #################################################################################
