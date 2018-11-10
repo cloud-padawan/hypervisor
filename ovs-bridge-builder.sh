@@ -246,18 +246,30 @@ fi
 # Uses container name, bridge name, and interface name as unique md5sum input
 # Will be globally unique while also being repeatable if required
 port_hwaddr_gen () {
-     
+[[ -z $lxd_CONT_NAME ]] \
+    && host_NAME=${lxd_CONT_NAME} \
+    || host_NAME=$(cat /etc/hostname)
+
     # run_log 0 Action
     run_log 0 "[s05.0b] > Generating Unique MAC Address for $add_OVS_PORT..." \
         
 
     # Collect input values
-    combined_HASH_INPUT="$name_OVS_BR$lxd_CONT_NAME$add_OVS_PORT"
+    combined_HASH_INPUT="${host_NAME}${name_OVS_BR}${add_OVS_PORT}"
 
     # Generate mac address
     # All OBB generated MAC addresses will start with "02"
-    port_IFACE_HWADDR=$( run_log 0 "$combined_HASH_INPUT" | md5sum \
+    if [[ -z $lxd_CONT_NAME ]]; then
+        port_IFACE_HWADDR=$( run_log 0 "$combined_HASH_INPUT" \
+        | md5sum \
         | sed 's/^\(..\)\(..\)\(..\)\(..\)\(..\).*$/02:\1:\2:\3:\4:\5/')
+
+    elif [[ ! -z $lxd_CONT_NAME ]]; then
+        port_IFACE_HWADDR=$( run_log 0 "$combined_HASH_INPUT" \
+        | md5sum \
+        | sed 's/^\(..\)\(..\)\(..\)\(..\)\(..\).*$/02\\:\1\\:\2\\:\3\\:\4\\:\5/')
+
+    fi
 
     # run_log 0 result
     run_log 0 "[s05.0s] > STAT: Using MAC Address: '$port_IFACE_HWADDR'" \
@@ -417,8 +429,9 @@ write_config_port_lxd () {
     lxd_IFACE_CFG_TARGET="$lxd_IFACE_DIR/$lxd_IFACE_CFG_FILE"
     lxd_IFACE_CFG_DEST="/etc/network/interfaces.d/"
 
-# Write ifup .cfg file
-echo "[s0X.2r] Writing configuration > $lxd_IFACE_CFG_TARGET"
+    # Write ifup .cfg file
+    echo "[s0X.2r] Writing configuration > $lxd_IFACE_CFG_TARGET"
+
 cat >$lxd_IFACE_CFG_TARGET <<EOF
 auto $add_OVS_PORT
 iface $add_OVS_PORT inet dhcp
@@ -433,8 +446,9 @@ write_config_network_virsh () {
     virsh_XML_FILE="$add_OVS_BR.xml"
     virsh_XML_TARGET="$xml_FILE_DIR/$virsh_XML_FILE"
 
-# Write xml configuration
-echo "[s0X.2r] Writing configuration > $virsh_XML_TARGET"
+    # Write xml configuration
+    run_log 0 "[s0X.2r] Writing configuration > $virsh_XML_TARGET"
+
 cat >$virsh_XML_TARGET <<EOF
 <network>
   <name>$add_OVS_BR</name>
@@ -443,6 +457,7 @@ cat >$virsh_XML_TARGET <<EOF
   <virtualport type='openvswitch'/>
 </network>
 EOF
+
 }
 
 #################################################################################
@@ -450,14 +465,14 @@ EOF
 build_bridge_virsh () {
 
     # run_log 0 Action
-    run_log 0 " > Configuring Network Definitions for Libvirtd+KVM+QEMU"
+    run_log 0 "Configuring Network Definitions for Libvirtd+KVM+QEMU"
 
     # Write virsh XML Network Definition
     write_config_network_virsh
 
     # Defining libvirt network $add_OVS_BR
     virsh net-define $virsh_XML_TARGET 
-    run_log 0 " > Defined virsh network"
+    run_log 0 "Defined virsh network"
 
     #Starting Libvirt network
     virsh net-start $add_OVS_BR
@@ -471,10 +486,16 @@ build_bridge_virsh () {
 #################################################################################
 # Create LXD Profile matching network bridge name
 build_profile_lxd () {
-echo "[s0X.1r] Building LXD Profile \"$add_OVS_BR\""
-$lxd_CMD profile create $lxd_PROFILE_NAME
-$lxd_CMD profile device add $lxd_PROFILE_NAME $add_OVS_BR nic nictype=bridged parent=$add_OVS_BR
-$lxd_CMD profile device add $lxd_PROFILE_NAME root disk path=/ pool=default
+run_log 0 "[s0X.1r] Building LXD Profile \"$add_OVS_BR\""
+
+    $lxd_CMD profile create $lxd_PROFILE_NAME
+
+    $lxd_CMD profile device add $lxd_PROFILE_NAME $add_OVS_BR \
+        nic nictype=bridged parent=$add_OVS_BR
+    
+    $lxd_CMD profile device add $lxd_PROFILE_NAME \
+        root disk path=/ pool=default
+
 }
 
 #################################################################################
@@ -510,17 +531,16 @@ build_network_lxd () {
 set_vars_lxd () {
 run_log 0 "[s0X.0s] Setting additional LXD Network and Profile Build Variables"
 
-# Configure DHCP function
-v4_DHCP="false"
-v6_DHCP="false"
+    # Configure DHCP function
+    v4_DHCP="false"
+    v6_DHCP="false"
 
-# Configure Routing/NAT'ing function - Valid Options "true|false" 
-v4_ROUTE="false"
-v6_ROUTE="false"
-
-run_log 0 "[s0X.0s]"
+    # Configure Routing/NAT'ing function - Valid Options "true|false" 
+    v4_ROUTE="false"
+    v6_ROUTE="false"
 
 lxd_PROFILE_NAME="$add_OVS_BR"
+run_log 0 "[s0X.0s]"
 }
 
 #################################################################################

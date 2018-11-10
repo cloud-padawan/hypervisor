@@ -10,6 +10,11 @@ Hypervisor configuration and management tools
 
     sudo ccio-install                                                                                
 
+  Then for usage
+
+    sudo obb -h
+    sudo obb --help
+
 ## Purpose:
 
 This tooling provides a common platform to quickly and seamlessly build virtual environments.
