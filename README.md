@@ -6,14 +6,29 @@ Hypervisor configuration and management tools
 #### To Install:
   Install full hypervisor setup and CCIO-Utils
 
+````sh   
     sudo curl -L https://goo.gl/YPSs6k | bash
-
     sudo ccio-install                                                                                
+````    
 
   Then for usage
 
+````sh   
     sudo obb -h
     sudo obb --help
+````    
+
+  Example: 
+````sh   
+    # Create New OVS Bridge
+    sudo obb --add-bridge lan
+
+    # Create New LXD Container
+    lxc launch ubuntu: test1
+
+    # Attach Container with Persistent MAC Address Interface to "lan" OVS Bridge 
+    sudo obb --add-port lan test1
+````    
 
 ## Purpose:
 
