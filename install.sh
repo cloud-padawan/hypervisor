@@ -5,17 +5,32 @@
 url_OBB="https://raw.githubusercontent.com/containercraft/hypervisor/master/ovs-bridge-builder.sh"
 virt_BUILD_ENV_URL="https://raw.githubusercontent.com/containercraft/hypervisor/master/ccio-build-environment-setup.sh"
 
-# Check if run as root!
-if [[ $EUID -ne 0 ]]; then
-        echo "$SEP_2 This script must be run as root!"
-	echo "$SEP_2 Exiting ... " 
+
+#################################################################################
+# Logging Function
+run_log () {
+
+    if [ $1 == 0 ]; then
+        [[ -z $? ]] && echo "INFO: $2"
+    elif [ $1 == 6 ]; then
+        echo "$2"
+    elif [ $1 == 22 ]; then
+        echo "WARN: $2"
+    elif [ $1 == 1 ]; then
+        echo "CRIT: $2"
+	    echo "CRIT: Exiting ... " 
         exit 1
-fi
+    fi
+}
+
+# Check if run as root!
+clear
+[[ $EUID -ne 0 ]] && run_log 1 "Must be run as root!"
 
 #################################################################################
 # End Script & Echo Install command 
 end_script_echo () {
-echo "
+run_log 6 "
 
    Thank you for downloading CCIO utils. 
    
@@ -30,57 +45,60 @@ exit 0
 #################################################################################
 # Write ccio.conf
 seed_ccio_conf () {
-echo "Checking service names ..."
+run_log 0 "Checking service names ..."
 
 # Determine host system's service names for LXD
 lxd_SVC_NAME_CHECK=$(systemctl list-unit-files \
                     | grep -E "lxd.service|snap.lxd.daemon.service" \
                     | awk '{print $1}')
+
+# Check if SVC Name Valid
 lxd_SVC_CHECK_SUCCESS="$?"
 if [[ $lxd_SVC_CHECK_SUCCESS -ne "0" ]]; then
     lxd_SVC_NAME_CHECK="DISABLED"
-    echo "OVS Service Not Found!"
-    echo "LXD Service: $lxd_SVC_NAME_CHECK"
+    run_log 22 "OVS Service Not Found!"
+    run_log 22 "LXD Service: $lxd_SVC_NAME_CHECK"
  else
-    echo "LXD Service: $lxd_SVC_NAME_CHECK"
+    run_log 0 "LXD Service: $lxd_SVC_NAME_CHECK"
 fi
 
 # Determine host system's service names for OVS
 ovs_SVC_NAME_CHECK=$(systemctl list-unit-files \
                     | grep -E "ovs-vswitchd.service|openvswitch-switch.service" \
                     | awk '{print $1}')
+
+# Check if SVC Name Valid
 ovs_SVC_CHECK_SUCCESS="$?"
 if [[ $ovs_SVC_CHECK_SUCCESS -ne "0" ]]; then
     ovs_SVC_NAME_CHECK="DISABLED"
-    echo "OVS Service Not Found!"
-    echo "OVS Service: $ovs_SVC_NAME_CHECK"
+    run_log 22 "OVS Service Not Found!"
+    run_log 22 "OVS Service: $ovs_SVC_NAME_CHECK"
  else
-    echo "OVS Service: $ovs_SVC_NAME_CHECK"
+    run_log 0 "OVS Service: $ovs_SVC_NAME_CHECK"
 fi
 
 # Determine host system's service names for LibVirt
-libvirt_SVC_NAME_CHECK=$(systemctl list-unit-files \
-                        | grep -E "libvirtd.service" \
-                        | awk '{print $1}')
+libvirt_SVC_NAME_CHECK=$(systemctl list-unit-files | awk '/libvirtd/ {print $1}')
 libvirt_SVC_CHECK_SUCCESS="$?"
+
+# Check if SVC Name Valid
 if [[ $libvirt_SVC_CHECK_SUCCESS -ne "0" ]]; then
     libvirt_SVC_NAME_CHECK="DISABLED"
-    echo "Libvirt Service Not Found!"
-    echo "KVM Service: $libvirt_SVC_NAME_CHECK"
+    run_log 22 "Libvirt Service Not Found!"
+    run_log 22 "KVM Service: $libvirt_SVC_NAME_CHECK"
  else
-    echo "KVM Service: $libvirt_SVC_NAME_CHECK"
+    run_log 0 "KVM Service: $libvirt_SVC_NAME_CHECK"
 fi
 
-echo "
-LXD Service: $lxd_SVC_NAME_CHECK
-OVS Service: $ovs_SVC_NAME_CHECK
-KVM Service: $libvirt_SVC_NAME_CHECK
-"
+run_log 0 "LXD Service: $lxd_SVC_NAME_CHECK"
+run_log 0 "OVS Service: $ovs_SVC_NAME_CHECK"
+run_log 0 "KVM Service: $libvirt_SVC_NAME_CHECK"
          
-# Write ccio.conf
-default_BR_NAME="ovsbr01"
-echo "Writing ccio.conf ..."
-cat >/etc/ccio/ccio.conf <<EOF
+    # Write ccio.conf
+    default_BR_NAME="ovsbr01"
+    run_log 0 "Writing ccio.conf ..."
+
+    cat >/etc/ccio/ccio.conf <<EOF
 # OVS-BridgeBuilder  --  Virtual Network Management utility
 # 
 # Use to manage LXD & Libvirt OpenVswitch Networks
@@ -127,37 +145,79 @@ EOF
 #################################################################################
 # Download and install obb tool
 install_obb () {
-rm /usr/bin/obb
-echo "Installing OVS_Bridge_Builder"
-wget -O /etc/ccio/tools/obb.sh $url_OBB
-chmod +x /etc/ccio/tools/obb.sh
-ln -s /etc/ccio/tools/obb.sh /usr/bin/obb
+
+    # Purge Old Files
+    rm -rf /usr/bin/obb*
+
+    # Download & Install OBB
+    run_log 0 "Installing OVS_Bridge_Builder"
+    wget -q $url_OBB -O /etc/ccio/tools/obb.sh
+
+    ln /etc/ccio/tools/obb.sh /usr/bin/obb
+    chmod +x /usr/bin/obb
+
 }
 
 #################################################################################
 # Download virt setup installer
 download_virt_requirements () {
-rm /usr/bin/ccio-install
-echo "Preparing ccio-install utility"
-wget -O /etc/ccio/tools/ccio-build-environment-setup.sh $virt_BUILD_ENV_URL
-chmod +x /etc/ccio/tools/ccio-build-environment-setup.sh
-ln -s /etc/ccio/tools/ccio-build-environment-setup.sh /usr/bin/ccio-install
+
+    # Remove init dependency
+    rm -rf /usr/bin/ccio-install
+
+    # Donwload & Install ccio-build-environment-setup Script
+    run_log 0 "Preparing ccio-install utility"
+    wget -q $virt_BUILD_ENV_URL -O /etc/ccio/tools/ccio-build-environment-setup.sh
+
+    ln /etc/ccio/tools/ccio-build-environment-setup.sh /usr/bin/ccio-install
+    chmod +x /usr/bin/ccio-install
+
 }
 
 #################################################################################
 # Create CCIO File System
 seed_ccio_filesystem () {
-echo "Seeding CCIO file system ..."
-mkdir -p /etc/ccio/tools
+
+    # Seeding ccio directory
+    run_log 0 "Seeding CCIO file system ..."
+    mkdir -p /etc/ccio/tools
+
 }
 
 #################################################################################
-# 
+# Purging Legacy Deb Based LXD Install
 purge_legacy_lxd () {
-echo "purging legacy LXD .deb installations"
-apt-get purge lxd lxd-client -y
+
+    # Remove debs
+    run_log 0 "purging legacy LXD .deb installations"
+    apt-get purge -qq lxd lxd-client -y
+
 }
 
+#################################################################################
+# Disclaimer Prompt & User Agreement
+user_agreement () {
+
+# Disclaimer 
+run_log 6 "You are about to wipe all LXD / OpenVSwitch / KVM Configuration.
+Are you sure you want to continue?"
+
+# Read User Agreement Response
+while true; do
+    read -rp "(Enter 'Yes' or 'No'):  " yn
+    case $yn in
+        [Yy]* ) run_log 6 "Confirmed. Continuing ...
+                "
+                break
+                ;;
+        [Nn]* ) run_log 1 "Canceling due to user input ...";
+                ;;
+            * ) run_log 0 "Please enter 'Yes' or 'No' ...";
+    esac
+done
+}
+
+user_agreement
 purge_legacy_lxd 
 seed_ccio_filesystem
 download_virt_requirements

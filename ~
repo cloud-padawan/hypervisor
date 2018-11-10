@@ -60,84 +60,67 @@ print_DBG_FLAGS="true"
 # Logging Function
 run_log () {
 
+    [[ $print_DBG_FLAGS = "true" ]] && \
+        show_DBG="${dbg_FLAG}" || \
+        show_DBG=""
+
     if [ $1 == 0 ]; then
-        echo "INFO: $2"
+        [[ -z $2 ]] echo "INFO: $show_FLAG $2"
     elif [ $1 == 6 ]; then
         echo "$2"
     elif [ $1 == 22 ]; then
-        echo "WARN: $2"
+        echo "WARN: $show_FLAG $2"
     elif [ $1 == 1 ]; then
-        echo "CRIT: $2"
-	    echo "CRIT: Exiting ... " 
+        echo "CRIT: $show_FLAG $2"
+	    echo "CRIT: $show_FLAG Exiting ... " 
         exit 1
     fi
 
 }
 
 #################################################################################
+# Check if run as root!
+if [[ $EUID -ne 0 ]]; then
+        run_log 1 "Must be run as root!"
+fi
+
+#################################################################################
 # Configure and validate libvirt installation
 configure_libvirt () {
-virt_VALIDATE=$(virt-host-validate ; echo $?)
-grub_SAFETY=$(grep iommu /etc/default/grub ; echo $?)
-virt_INTEL=$(grep vmx /proc/cpuinfo; echo $?)
-virt_AMD=$(grep svm /proc/cpuinfo; echo $?)
-
-    mkdir -p /etc/ccio/virsh_xml
-    if [[ ! $virt_VALIDATE == "0" ]] && \
-       [[ ! $grub_SAFETY == "0" ]]; then
-        if [[ $virt_INTEL == "0" ]]; then
-
-            sed -i \
-                's/^GRUB_CMDLINE_LINUX_DEFAULT.*/& intel_iommu=on iommu=pt/' \
-                /etc/default/grub
-            update-grub
-
-        elif [[ $virt_AMD == "0" ]]; then
-
-            sed -i \
-                's/^GRUB_CMDLINE_LINUX_DEFAULT.*/& amd_iommu=on iommu=pt/' \
-                /etc/default/grub
-            update-grub
-
-        fi
-    else
-
-        run_log 0 "No Hardware VTd/AMD-V Virtual Extensions Detected"
-        run_log 0 "Running in paravirtualized mode"
-
-    fi
-
+dbg_FLAG="WARNING! All automated Libvirt configuration currently disabled!!!" run_log 0 
+mkdir -p /etc/ccio/virsh_xml
+virt-host-validate
 }
 
 #################################################################################
 # install Libvirt | KVM | QEMU packages
 install_libvirt () {
-LIBVIRT_PKGS="qemu qemu-kvm qemu-utils libvirt0 libvirt-clients"
-
-    run_log 0 "Installing Libvirt packages"
-
-    apt install -y $LIBVIRT_PKGS #>/dev/null 2&>1
-
-    run_log 0 "Installed LibvirtD + KVM + QEMU Requirements"
-
+echo "[f25.0s] Installing Libvirt packages"
+LIBVIRT_PKGS="qemu qemu-kvm qemu-utils libvirt-bin libvirt0"
+#EFI_PKGS="qemu-efi \
+#          ovmf"
+       apt install $LIBVIRT_PKGS
+       #apt install -y $LIBVIRT_PKGS #EFI_PKGS
+echo "$SEP_2 Installed LibvirtD + KVM + QEMU Requirements!"
 }
 
 #################################################################################
-# Prompt User to Continue Libvirt Installation
 prompt_libvirt_install () {
 while true; do
    	read -rp "$SEP_2 Do you want to continue installation?" yn
-        case $yn in
-   		    [Yy]* ) run_log 0 "Continuing ..." 
-                    libvirt_install
-                    break
-                    ;;
-	        [Nn]* ) run_log 1 "Exiting due to user input!"
-                    ;;
-   	            * ) run_log 0 "Please answer yes or no."
-        esac
+   	case $yn in
+   		[Yy]* ) echo "$SEP_2 Continuing ..." ; 
+            libvirt_install
+   			break
+            ;;
+		[Nn]* ) echo "$SEP_2 Exiting due to user input!"
+  			exit 1
+            ;;
+   		* ) echo "$SEP_2 Please answer yes or no." ;;
+	esac
     break
 done
+echo "[f10.0e]"
 }
 
 #################################################################################
@@ -145,32 +128,26 @@ done
 #   (Usually enabled in BIOS on supported hardware)
 #   EG: VT-d or AMD-V 
 check_host_virt_support () {
+echo "[f10.0b]"
 check_HOST_VIRT_EXT=$(grep -E '(vmx|svm)' /proc/cpuinfo)
-
-run_log 0 "Checking Host System Virtual Extensions"
-
 if [ "$check_HOST_VIRT_EXT" != "0" ]; then
-
-	    run_log 0 "System passed host virtual extension support check"
-        install_libvirt
-
+    echo "[f10.1r]"
+	echo "$SEP_2 System passed host virtual extension support check"
+    install_libvirt
 elif [ "$check_HOST_VIRT_EXT" != "0" ]; then
-
-    run_log 0 "
-    Host did not pass virtual extension support check!
-    This means that your hardware either does not support
-    KVM acceleration (VT-d|AMD-v), or the feature has not
-    yet been enabled in BIOS.
-
-    You may continue installation however libvirt guests will
-    only run in PVM mode. PVM guests will experience
-    significantly degrated performance as compared to
-    running with full HVM support.
-    "
-
-    # Begin Libvirtd Installation
+    echo "[f10.2r]"
+	echo "$SEP_2 ERROR: Host did not pass virtual extension support check!"
+	echo "       $SEP_2 This means that your hardware either does not support"
+	echo "       $SEP_2 KVM acceleration (VT-d|AMD-v), or the feature has not"
+	echo "       $SEP_2 yet been enabled in BIOS."
+	echo "       $SEP_2 You may continue installation but libvirt guests will"
+	echo "       $SEP_2 only run in PVM mode. PVM guests will experience"
+	echo "       $SEP_2 significantly degrated performance as compared to"
+	echo "       $SEP_2 running with full HVM support.
+	     "
+    echo "[f10.3r]"
     prompt_install_libvirt
-
+echo "[f10.0e]"
 fi
 }
 
@@ -185,29 +162,31 @@ zpool_TYPE="zfs"
     run_log 0 "CCIO_Setup is about to purge any zfs pools and lxd storage"
     run_log 0 "matching the name \"$zpool_NAME\""
 
-if [ "$(zpool list $zpool_NAME; echo $?)" = "0" ]; then 
-        run_log 0 "No pre-existing storage pools found matching $zpool_NAME"
-        run_log 0 "Continuing ..."
+    if [ "$(zpool list $zpool_NAME; echo $?)" = "0" ]; then 
+        echo "No pre-existing storage pools found matching $zpool_NAME"
     else
-        run_log 0 "Found existing ZFS configuration showing pool information
+        echo "$SEP_2 Showing pool information
     "
 
-        zpool list $zpool_NAME
+    zpool list $zpool_NAME
 
-        #lxc storage list | grep $zpool_NAME
-        echo ""
-        while true; do
-        read -rp "Are you sure $zpool_NAME is safe to erase?" yn
-            case $yn in
-                [Yy]* ) run_log 0 "Purging $zpool_NAME ...." 
-                        break
-                        ;;
-                [Nn]* ) run_log 1 "Exiting due to user input" 
-                        ;;
-                    * ) echo "Please answer yes or no.";;
-            esac
-        break
-    done
+    #lxc storage list | grep $zpool_NAME
+    echo ""
+    while true; do
+    read -rp "Are you sure $zpool_NAME is safe to erase?" yn
+        case $yn in
+            [Yy]* ) 
+                run_log 0 "Purging $zpool_NAME ...." 
+                break
+                ;;
+            [Nn]* ) 
+                run_log 1 "Exiting due to user input" 
+                ;;
+            * ) 
+                echo "Please answer yes or no.";;
+        esac
+    break
+done
 fi
 }
 
@@ -266,12 +245,10 @@ EOF
 install_lxd_legacy_ppa () {
 
     run_log 0 "Installing LXD from PPA"
-    apt purge -qqq -y lxd lxd-client >/dev/null 2>&1
+    apt purge lxd lxd-client
 
-    #apt-add-repository ppa:ubuntu-lxc/stable -y
-	#apt install -qqq -y -t xenial-backports \
-    apt update -qqq >/dev/null 2>&1
-	apt install -y \
+    apt-add-repository ppa:ubuntu-lxc/stable -y && apt update
+	apt install -y -t xenial-backports \
                       lxd \
                       lxd-client \
                       lxd-tools \
@@ -283,7 +260,7 @@ install_lxd_legacy_ppa () {
                       zfsutils-linux \
                       btrfs-tools \
                       squashfuse \
-                      ebtables >/dev/null 2>&1
+                      ebtables
 
     run_log 0 "Installed LXD requirements successfully!"  
 
@@ -294,44 +271,50 @@ install_lxd_legacy_ppa () {
 install_lxd_snap () {
 
     PS3="
-    CAUTION, this is a DESTRUCTIVE ACTION!
+      CAUTION, this is a DESTRUCTIVE ACTION!
 
-    DO NOT PROCEED UNLESS YOU UNDERSTAND THIS CAN ERASE DATA!
+      DO NOT PROCEED UNLESS YOU UNDERSTAND THIS CAN ERASE DATA!
 
-    This installer is intended to be run on a clean install of Ubuntu.
-    Running in any other conditions may have unexpected results.
+      This installer is intended to be run on a clean install of Ubuntu.
+      Running in any other conditions may have unexpected results.
 
-    Continuing will remove any legacy "lxd" & "lxd-client" .deb packages.
-    This does NOT affect the snap install of lxd. 
-    Once the ppa ".deb" packages have been removed you will not have access
-    to any previously created LXD containers created with those packages.
+      Continuing will remove any legacy "lxd" & "lxd-client" .deb packages.
+      This does NOT affect the snap install of lxd. 
+      Once the ppa ".deb" packages have been removed you will not have access
+      to any previously created LXD containers created with those packages.
 
-    Select: "
+Select: "
+echo "
+      Are you sure you want to continue? 
 
-    run_log 0 "
-        Are you sure you want to continue? 
-    "
+     "
 
 options=("Continue" "Cancel")
 select opt in "${options[@]}"; do
     case $REPLY in
-      "Continue") run_log 0 "Continuing LXD Installation ..."
-                  ;;
-        "Cancel") run_log 1 "Canceling due to user input"
-                  ;;
-               *) run_log 6 "$1 is not a valid option"
-                  ;;
-        esac
+        "Continue")
+            echo "Continuing LXD Installation ..."
+            ;;
+        "Cancel")
+            echo "Canceling due to user input"
+            echo "Exiting immidiately ..."
+            exit 1
+            ;;
+        *)
+            echo "$1 is not a valid option"
+            echo "Please type in: 'Continue' or 'Cancel'"
+            ;;
+    esac
     break
 done
 
     # Purge legacy lxd packages
-    apt purge lxd lxd-client -y 2&>1
+    apt purge lxd lxd-client -y
 
     # Install lxd
     echo "Installing LXD via snappy package"
-    apt install -y zfsutils-linux squashfuse 
-    snap install lxd 2&>1
+    apt install -y zfsutils-linux squashfuse
+    snap install lxd 
 
 }
 
@@ -374,7 +357,7 @@ done
 # If supported & user approves, enable dpdk
 configure_openvswitch () {
 
-    run_log 0 "Enable OVS systemd service"
+    dbg_FLAG="Enable OVS systemd service" run_log 0 
 	systemctl restart openvswitch-switch.service
 	systemctl enable openvswitch-switch.service
 
@@ -386,27 +369,23 @@ install_openvswitch () {
 OVS_PKGS="openvswitch-common openvswitch-switch"
 OVS_DPDK_PKGS="dkms dpdk dpdk-dev openvswitch-switch-dpdk"
 
-    run_log 0 "Installing OpenVSwitch Components"
-	apt install -y $OVS_PKGS $OVS_DPDK_PKGS 
+    dbg_FLAG="Installing OpenVSwitch Components" run_log 0 
+	apt install -y $OVS_PKGS $OVS_DPDK_PKGS
 
 }
 
 #################################################################################
 # System upgrade routine called when required
 apt_upgrade () {
-
-    apt upgrade -y -qqq 2>&1
-    apt dist-upgrade -y -qqq 2>&1
-    apt autoremove -y -qqq 2>&1
-
+apt upgrade -y 
+apt dist-upgrade -y 
+apt autoremove -y
 }
 
 #################################################################################
 # System update routine called when required
 apt_udpate () {
-
-    apt update -y -qqq #>/dev/null 2>&1
-
+apt update 
 }
 
 #################################################################################
@@ -433,39 +412,32 @@ read_MORE () {
 #################################################################################
 # Check if services are installed & launch installers if required
 cmd_parse_run () {
-check_OVS_IS_INSTALLED="$(command -v ovs-vsctl >/dev/null; echo $?)"
-check_LIBVIRT_IS_INSTALLED="$(command -v libvirtd >/dev/null; echo $? )"
-check_LXD_IS_INSTALLED="$(command -v lxd >/dev/null; echo $? )"
+check_OVS_IS_INSTALLED=\
+    "$(command -v ovs-vsctl >/dev/null; echo $?)"
+check_LIBVIRT_IS_INSTALLED=\
+    "$(command -v libvirtd >/dev/null; echo $? )"
+check_LXD_IS_INSTALLED=\
+    "$(command -v lxd >/dev/null; echo $? )"
 
-run_log 0 "Running system updates ..."
-    apt_udpate 
-    apt_upgrade 
+dbg_FLAG="Running system updates ..." run_log 0 
+    apt_udpate
+    apt_upgrade
 
-run_log 0 "Checking if OpenVSwitch is Installed..."
-if [[ "$check_OVS_IS_INSTALLED" == "0" ]]; then
+dbg_FLAG="$check_OVS_IS_INSTALLED" \
+    run_log 0 "is ovs installed, .... checking"
+if [ "$check_OVS_IS_INSTALLED" != "0" ]; then
 
-    # Confirm OpenVSwitch Already Installed
-    run_log 0 "OpenVSwitch Already Installed, Continuing.. "
-
-elif [[ "$check_OVS_IS_INSTALLED" != "0" ]]; then
-
-    # Install OpenVSwitch
-    run_log 0 "installing openvswitch"
+    dbg_FLAG="installing openvswitch" run_log 0 
     install_openvswitch
 
-    run_log 0 "configuring openvswitch"
+    dbg_FLAG="configuring openvswitch" run_log 0 
     configure_openvswitch 
-
 fi
 
-run_log 0 "Is LXD installed, .... checking"
-if [[ $check_LXD_IS_INSTALLED == "0" ]]; then
+run_log 0 "Is lxd installed, .... checking"
+if [ $check_LXD_IS_INSTALLED != "0" ]; then
 
-    run_log 0 "LXD Already installed on system"
-
-elif [[ $check_LXD_IS_INSTALLED != "0" ]]; then
-
-    dbg_FLAG="Installing lxd" run_log 0
+    dbg_FLAG="installing lxd" run_log 0
     check_install_source_lxd 
 
     dbg_FLAG="configuring lxd" run_log 0
@@ -473,23 +445,23 @@ elif [[ $check_LXD_IS_INSTALLED != "0" ]]; then
 
 fi
 
-run_log 0 "Is libvirt installed, .... checking"
-if [[ "$check_LIBVIRT_IS_INSTALLED" != "0" ]]; then
+run_log 0 "is libvirt installed, .... checking"
+if [ "$check_LIBVIRT_IS_INSTALLED" != "0" ]; then
 
-        run_log 0 "Checking Host Virtual Extensions"
+        dbg_FLAG="installing libvirt" run_log 0 
         check_host_virt_support
 
-        run_log 0 "Configuring libvirt"
+        dbg_FLAG="Configuring libvirt" run_log 0 
         configure_libvirt 
 
 fi
 
-run_log 0 "Final System Check... "
-if [[ "$check_LIBVIRT_IS_INSTALLED" = "0" ]] && \
-       [[ "$check_LXD_IS_INSTALLED" = "0" ]]  && \
-       [[ "$check_OVS_IS_INSTALLED" = "0" ]]; then
+dbg_FLAG="Final System Check... " run_log 0
+if [ "$check_LIBVIRT_IS_INSTALLED" = "0" ] && \
+   [ "$check_LXD_IS_INSTALLED" = "0" ]     && \
+   [ "$check_OVS_IS_INSTALLED" = "0" ];    then
 
-       dbg_FLAG="Removing ccio-install binary" run_log 0
+       dbg_FLAG="Removing ccio-install binary" run_log 0 
        rm /usr/bin/ccio-install
 
        run_log 0 "All services are already installed"
@@ -498,13 +470,6 @@ fi
 }
 
 
-#################################################################################
-# Check if run as root!
-clear
-[[ $EUID -ne 0 ]] && run_log 1 "Must be run as root!"
-
-#################################################################################
-# Begin Main Function
 cmd_parse_run
 
 #===============================================================================#
