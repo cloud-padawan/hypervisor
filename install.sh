@@ -128,6 +128,7 @@ show_HEALTH="false"
 show_CONFIG="false"
 ovs_BR_DRIVER="openvswitch"
 lxd_CMD="lxc"
+lxd_IFACE_DIR="/etc/ccio/interfaces.d"
 purge_DEAD_OVS_PORTS="false"
 delete_NETWORK="false"
 add_OVS_PORT="false"
@@ -181,6 +182,7 @@ seed_ccio_filesystem () {
     # Seeding ccio directory
     run_log 0 "Seeding CCIO file system ..."
     mkdir -p /etc/ccio/tools
+    mkdir -p /etc/ccio/interfaces.d
 
 }
 
