@@ -852,7 +852,7 @@ echo "                  Status = $libvirt_SERVICE_STATUS
 "
 
 # If OVS Service is not active, error & attempt to start service
-if [ "$ovs_SERVICE_STATUS" != active ]; then
+if [ "$ovs_SERVICE_STATUS" != "active" ]; then
     dead_SERVICE_NAME="ovs_SERVICE_NAME"
     dbg_FLAG="[h03.1r] > WARN: Dead Service Found  =  $dead_SERVICE_NAME"
     echo " > ERROR: The OpenVSwitch System Service is NOT RUNNING"
@@ -862,7 +862,7 @@ fi
 
 # If LXD Service is not active, error & attempt to start service
 if [ "$lxd_SERVICE_STATUS" != "active" ]; then
-    dead_SERVICE_NAME="lxd_SERVICE_NAME"
+    dead_SERVICE_NAME="$lxd_SERVICE_NAME"
     dbg_FLAG="[h03.2r] > WARN: Dead Service Found  =  $dead_SERVICE_NAME"
     echo " > ERROR: The LXD System Service IS NOT RUNNING"
     echo " > Attempting to start $dead_SERVICE_NAME"

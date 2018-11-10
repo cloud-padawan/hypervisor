@@ -120,6 +120,8 @@ LIBVIRT_PKGS="qemu qemu-kvm qemu-utils libvirt0 libvirt-clients"
 
     run_log 0 "Installed LibvirtD + KVM + QEMU Requirements"
 
+libvirt_SVC_NAME_CHECK=$(systemctl list-unit-files | awk '/libvirtd/ {print $1}')
+sed -i "s/libvirt_SERVICE_NAME=*/libvirt_SERVICE_NAME=\"$libvirt_SVC_NAME_CHECK\"/g" /etc/ccio/ccio.conf
 }
 
 #################################################################################
@@ -266,12 +268,13 @@ EOF
 install_lxd_legacy_ppa () {
 
     run_log 0 "Installing LXD from PPA"
+    snap remove lxd 2&>/dev/null
     apt purge -qqq -y lxd lxd-client >/dev/null 2>&1
 
     #apt-add-repository ppa:ubuntu-lxc/stable -y
 	#apt install -qqq -y -t xenial-backports \
-    apt update -qqq >/dev/null 2>&1
-	apt install -y \
+    #apt update -qqq >/dev/null 2>&1
+	apt install -y --assume-yes \
                       lxd \
                       lxd-client \
                       lxd-tools \
@@ -283,7 +286,7 @@ install_lxd_legacy_ppa () {
                       zfsutils-linux \
                       btrfs-tools \
                       squashfuse \
-                      ebtables >/dev/null 2>&1
+                      ebtables 
 
     run_log 0 "Installed LXD requirements successfully!"  
 
@@ -333,6 +336,12 @@ done
     apt install -y zfsutils-linux squashfuse 
     snap install lxd 2&>1
 
+# Determine host system's service names for LXD
+lxd_SVC_NAME_CHECK=$(systemctl list-unit-files \
+                    | grep -E "lxd.service|snap.lxd.daemon.service" \
+                    | awk '{print $1}')
+
+sed -i "s/lxd_SERVICE_NAME=*/lxd_SERVICE_NAME=\"$lxd_SVC_NAME_CHECK\""
 }
 
 #################################################################################
@@ -389,6 +398,12 @@ OVS_DPDK_PKGS="dkms dpdk dpdk-dev openvswitch-switch-dpdk"
     run_log 0 "Installing OpenVSwitch Components"
 	apt install -y $OVS_PKGS $OVS_DPDK_PKGS 
 
+# Determine host system's service names for OVS
+ovs_SVC_NAME_CHECK=$(systemctl list-unit-files \
+                    | grep -E "ovs-vswitchd.service|openvswitch-switch.service" \
+                    | awk '{print $1}')
+
+sed -i "s/ovs_SERVICE_NAME=*/ovs_SERVICE_NAME=\"$ovs_SVC_NAME_CHECK\"" /etc/ccio/ccio.conf
 }
 
 #################################################################################
