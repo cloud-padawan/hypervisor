@@ -161,8 +161,7 @@ lxc_container_set () {
 #################################################################################
 # If container was running, restart container
 lxd_cont_resume () {
-echo "LXD Container $lxd_CONT_NAME is currently $lxd_CONT_IS_STATE"
-if [ $lxd_CONT_IS_STATE = "RUNNING" ]; then
+if [[ $lxd_CONT_IS_STATE = "RUNNING" ]]; then
 
     # Start Container
     run_log 0 "Restoring LXD Container state to: $lxd_CONT_IS_STATE"
@@ -210,15 +209,35 @@ lxd_cont_halt_check () {
     lxd_CONT_IS_STATE=$($lxd_CMD list \
         --format=csv -c n,s | grep $lxd_CONT_NAME | awk -F',' '{print $2}' )
 
-    # run_log 0 current status
-    run_log 0 "LXD Container $lxd_CONT_NAME is currently running"
+}
+
+#################################################################################
+# Check LXD Container Run State & halt if running 
+# If container is running, halt container with user permission or abort obb
+lxd_port_remove_confirm () {
+    # Confirm port device removal
+    # If "Y" .. Stop Container
+    # If "N" .. Abort Configuration
+    run_log 0 "Conflicting network device detected!"
+    while true; do
+        read -rp "Would you like to remove the device: $add_OVS_PORT  " yn
+        case $yn in
+            [Yy]* ) run_log 0 "Confirmed ..... removing device $lxd_CONT_NAME";
+                $lxd_CMD config device remove $lxd_CONT_NAME $add_OVS_PORT
+                break
+                ;;
+            [Nn]* ) run_log 1 "User Rejected ...... Aborting obb!"
+                ;;
+            * ) run_log 0 "Please answer yes or no" ;;
+        esac
+    done
 }
 
 #################################################################################
 # Check LXD Container Run State & halt if running 
 # If container is running, halt container with user permission or abort obb
 lxd_cont_halt_confirm () {
-if [ $lxd_CONT_IS_STATE = 'RUNNING' ]; then
+if [[ ! $lxd_CONT_IS_STATE == 'STOPPED' ]]; then
     # run_log 0 current status
     run_log 0 "LXD Container $lxd_CONT_NAME is currently running"
 
@@ -436,6 +455,8 @@ cat >$lxd_IFACE_CFG_TARGET <<EOF
 auto $add_OVS_PORT
 iface $add_OVS_PORT inet dhcp
 EOF
+
+
 }
 
 #################################################################################
@@ -708,12 +729,14 @@ if [ $ovs_BR_IS_REAL = "0" ] && [ $lxd_CONT_IS_REAL = "0" ]; then
     run_log 0 "[f02.5r] >           HW Address:   $port_IFACE_HWADDR
      " 
 
-    # Halt container if there is a conflicting port already configured 
+    # Halt Container for network device attachment 
+    lxd_cont_halt_check
+    lxd_cont_halt_confirm 
+
     # Remove conflicting port once container is stopped
+    # if there is a conflicting port already configured 
     if [[ $check_IFACE_CFG_IS_CONTAINER = "0" ]] ; then
-        lxd_cont_halt_check
-        lxd_cont_halt_confirm 
-        $lxd_CMD config device remove $lxd_CONT_NAME $add_OVS_PORT
+        lxd_port_remove_confirm
     fi
         
     # Write LXD Container Iface .cfg file
@@ -727,6 +750,7 @@ if [ $ovs_BR_IS_REAL = "0" ] && [ $lxd_CONT_IS_REAL = "0" ]; then
     $lxd_CMD config set $lxd_CONT_NAME volatile.$add_OVS_PORT.name $add_OVS_PORT
     $lxd_CMD config set $lxd_CONT_NAME volatile.$add_OVS_PORT.host_name $add_OVS_PORT
     $lxd_CMD config set $lxd_CONT_NAME volatile.$add_OVS_PORT.hwaddr $port_IFACE_HWADDR
+    echo "Pushing Config to Container"
     $lxd_CMD file push $lxd_IFACE_CFG_TARGET $lxd_CONT_NAME$lxd_IFACE_CFG_DEST
 
     # Check if container was running at start of configuration 
