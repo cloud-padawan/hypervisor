@@ -21,13 +21,16 @@ Hypervisor configuration and management tools
   Example: 
 ````sh   
     # Create New OVS Bridge
+    # sudo obb --add-bridge [ovs bridge name]
     sudo obb --add-bridge lan
 
     # Create New LXD Container
+    # lxc launch [image repository] [container name]
     lxc launch ubuntu: test1
 
     # Attach Container with Persistent MAC Address Interface to "lan" OVS Bridge 
-    sudo obb --add-port lan test1
+    # sudo obb --add-port [ovs bridge] [unique interface name] [container name]
+    sudo obb --add-port lan test1-eth1 test1
 ````    
 
 ## Purpose:

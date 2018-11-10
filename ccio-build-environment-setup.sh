@@ -258,6 +258,9 @@ profiles:
       type: disk
 EOF
 
+    # Add BCIO Container Repository Mirror
+    lxc remote add bcio https://images.braincraft.io --public --accept-certificate
+
     unset PASSWD
     run_log 0 "LXD Configuration Complete"
 }
