@@ -1,5 +1,3 @@
-#!/bin/bash
-
 # OVS-BridgeBuilder  --  Virtual Network Management utility
 # 
 # Use to manage LXD & Libvirt OpenVswitch Networks
@@ -10,16 +8,16 @@
 # 
 # Initial prep and variable are sourced from the ccio.conf file
 # All actions are executed within functions
-# All functions originate from the " function first
-# The "RUN" function starts at the bottom of the script
-# All other functions are arranged roughly in the order of the script's logic
-# from bottom to top. 
 
-# Debugging Switches
-  dbg_BREAK="false"
-  print_DBG_FLAGS="false"
-# dbg_BREAK="false"
-# print_DBG_FLAGS="false"
+# Debugging Switches [true|false]
+dbg_BREAK="false"
+print_DBG_FLAGS="false"
+
+# Host System Service Names
+# Will be disabled at install time if service is not installed on host
+ovs_SERVICE_NAME="ovs-vswitchd"
+lxd_SERVICE_NAME="snap.lxd.daemon.service"
+libvirt_SERVICE_NAME="libvirtd.service"
 
 # Default Run Values
 xml_FILE_DIR="/etc/ccio/virsh_xml"
@@ -27,18 +25,17 @@ show_HELP="false"
 show_HELP_LONG="false"
 show_HEALTH="false"
 show_CONFIG="false"
-ovs_SERVICE_NAME="ovs-vswitchd.service"
-lxd_SERVICE_NAME="lxd.service"
-libvirt_SERVICE_NAME="libvirtd.service"
 ovs_BR_DRIVER="openvswitch"
 lxd_CMD="lxc"
+lxd_IFACE_DIR="/etc/ccio/interfaces.d"
 purge_DEAD_OVS_PORTS="false"
 delete_NETWORK="false"
 add_OVS_PORT="false"
 default_BR_NAME="ovsbr01"
-name_OVS_BR="$default_BR_NAME"
+name_OVS_BR="ovsbr01"
 lxd_CONT_NAME="false"
 ovs_BR_NAME="false"
+add_OVS_BR="false"
 ovs_ADD_PORT="false"
 
-dbg_FLAG="[d00.0b] > Imported ccio.conf" && print_dbg_flags;
+echo "INFO: [d00.0b] > Imported ccio.conf"
