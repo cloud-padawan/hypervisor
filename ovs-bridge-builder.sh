@@ -468,10 +468,12 @@ lxd_IFACE_CFG_DEST="/etc/netplan/"
 echo $lxd_IFACE_CFG_DEST
 
 sudo cat >$lxd_IFACE_CFG_TARGET <<EOF
+# Find Templates for further configuration:
+# https://netplan.io/examples
 network:
     version: 2
     ethernets:
-        maas-eth0:
+        $add_OVS_PORT:
             dhcp4: true
 EOF
 fi
@@ -1023,7 +1025,7 @@ run_log 0 "[h02.0e] > Print Long End"
 
 #################################################################################
 # Check if run as root!
-#[[ $EUID -ne 0 ]] && run_log 1 "Must be run as root!"
+[[ $EUID -ne 0 ]] && run_log 1 "Must be run as root!"
 
 #################################################################################
 # Start initial function that determines behavior from command line flags
