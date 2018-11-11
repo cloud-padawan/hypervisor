@@ -443,18 +443,38 @@ fi
 # Create Ifup port .cfg Configuration File
 write_config_port_lxd () {
 
-    # Set Iface .cfg target file and directory
-    lxd_IFACE_CFG_FILE="$add_OVS_PORT.cfg"
-    lxd_IFACE_CFG_TARGET="$lxd_IFACE_DIR/$lxd_IFACE_CFG_FILE"
-    lxd_IFACE_CFG_DEST="/etc/network/interfaces.d/"
 
     # Write ifup .cfg file
     echo "[s0X.2r] Writing configuration > $lxd_IFACE_CFG_TARGET"
 
-cat >$lxd_IFACE_CFG_TARGET <<EOF
+if [[ $check_NETPLAN -lt "18" ]]; then
+
+# Set Iface .cfg target file and directory
+lxd_IFACE_CFG_FILE="$add_OVS_PORT.cfg"
+lxd_IFACE_CFG_TARGET="$lxd_IFACE_DIR/$lxd_IFACE_CFG_FILE"
+lxd_IFACE_CFG_DEST="/etc/network/interfaces.d/"
+
+sudo cat >$lxd_IFACE_CFG_TARGET <<EOF
 auto $add_OVS_PORT
 iface $add_OVS_PORT inet dhcp
 EOF
+
+elif [[ $check_NETPLAN -ge "18" ]]; then
+
+# Set Iface .yaml target file and directory
+lxd_IFACE_CFG_FILE="60-${add_OVS_PORT}.yaml"
+lxd_IFACE_CFG_TARGET="$lxd_IFACE_DIR/$lxd_IFACE_CFG_FILE"
+lxd_IFACE_CFG_DEST="/etc/netplan/"
+echo $lxd_IFACE_CFG_DEST
+
+sudo cat >$lxd_IFACE_CFG_TARGET <<EOF
+network:
+    version: 2
+    ethernets:
+        maas-eth0:
+            dhcp4: true
+EOF
+fi
 
 
 }
@@ -729,6 +749,9 @@ if [ $ovs_BR_IS_REAL = "0" ] && [ $lxd_CONT_IS_REAL = "0" ]; then
     run_log 0 "[f02.5r] >           HW Address:   $port_IFACE_HWADDR
      " 
 
+    # Check if netplan is present in container
+    check_NETPLAN=$(lxc config show $lxd_CONT_NAME | awk -F[\".] '/image.version/ {print $3}')
+
     # Halt Container for network device attachment 
     lxd_cont_halt_check
     lxd_cont_halt_confirm 
@@ -751,6 +774,9 @@ if [ $ovs_BR_IS_REAL = "0" ] && [ $lxd_CONT_IS_REAL = "0" ]; then
     $lxd_CMD config set $lxd_CONT_NAME volatile.$add_OVS_PORT.host_name $add_OVS_PORT
     $lxd_CMD config set $lxd_CONT_NAME volatile.$add_OVS_PORT.hwaddr $port_IFACE_HWADDR
     echo "Pushing Config to Container"
+    echo "$lxd_IFACE_CFG_TARGET"
+    echo "$lxd_CONT_NAME"
+    echo "$lxd_IFACE_CFG_DEST"
     $lxd_CMD file push $lxd_IFACE_CFG_TARGET $lxd_CONT_NAME$lxd_IFACE_CFG_DEST
 
     # Check if container was running at start of configuration 

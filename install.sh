@@ -128,7 +128,7 @@ show_HEALTH="false"
 show_CONFIG="false"
 ovs_BR_DRIVER="openvswitch"
 lxd_CMD="lxc"
-lxd_IFACE_DIR="/etc/ccio/interfaces.d"
+lxd_IFACE_DIR="/etc/ccio/interfaces"
 purge_DEAD_OVS_PORTS="false"
 delete_NETWORK="false"
 add_OVS_PORT="false"
@@ -180,9 +180,12 @@ download_virt_requirements () {
 seed_ccio_filesystem () {
 
     # Seeding ccio directory
+    groupadd ccio
     run_log 0 "Seeding CCIO file system ..."
     mkdir -p /etc/ccio/tools
-    mkdir -p /etc/ccio/interfaces.d
+    mkdir -p /etc/ccio/interfaces
+    chown -R root:ccio /etc/ccio
+    chmod g+s /etc/ccio
 
 }
 
