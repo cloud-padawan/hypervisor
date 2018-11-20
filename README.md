@@ -7,7 +7,7 @@ Hypervisor configuration and management tools
   Install full hypervisor setup and CCIO-Utils
 ````sh   
     sudo apt install -y curl
-    wget -O install-ccio.sh https://goo.gl/YPSs6k
+    wget -O install-ccio-setup.sh https://goo.gl/YPSs6k
     source install-ccio-setup.sh
     sudo ccio-install                                                                                
 ````    
