@@ -112,7 +112,7 @@ virt_AMD=$(grep svm /proc/cpuinfo; echo $?)
 #################################################################################
 # install Libvirt | KVM | QEMU packages
 install_libvirt () {
-LIBVIRT_PKGS="qemu qemu-kvm qemu-utils libvirt0 libvirt-clients libvirt-daemon"
+LIBVIRT_PKGS="qemu qemu-kvm qemu-utils libvirt0 libvirt-bin libvirt-clients libvirt-daemon"
 
     run_log 0 "Installing Libvirt packages"
 
@@ -404,7 +404,7 @@ OVS_DPDK_PKGS="dkms dpdk dpdk-dev openvswitch-switch-dpdk"
 
 # Determine host system's service names for OVS
 ovs_SVC_NAME_CHECK=$(systemctl list-unit-files \
-                    | grep -E "ovs-vswitchd.service|openvswitch-switch.service"\
+                    | grep -E "openvswitch-switch.service"\
                     | awk '{print $1}')
 
 sed -i "s/ovs_SERVICE_NAME=\"*\"/ovs_SERVICE_NAME=\"$ovs_SVC_NAME_CHECK\"/g" /etc/ccio/ccio.conf
