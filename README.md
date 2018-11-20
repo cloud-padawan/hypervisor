@@ -5,20 +5,25 @@ Hypervisor configuration and management tools
 
 #### To Install:
   Install full hypervisor setup and CCIO-Utils
-
 ````sh   
-    sudo curl -L https://goo.gl/YPSs6k | bash
+    sudo apt install -y curl
+    wget -O install-ccio.sh https://goo.gl/YPSs6k
+    source install-ccio-setup.sh
     sudo ccio-install                                                                                
-    sudo suermod -a -G ccio $USER_NAME
-    sudo suermod -a -G lxd $USER_NAME
-    sudo suermod -a -G libvirt $USER_NAME
+````    
+
+  Add your user to the appropriate groups
+````sh   
+    sudo usermod -a -G ccio $USER_NAME
+    sudo usermod -a -G lxd $USER_NAME
+    sudo usermod -a -G libvirt $USER_NAME
 ````    
 
   Then for usage
-
 ````sh   
     sudo obb -h
     sudo obb --help
+    sudo obb --show-health
 ````    
 
   Example: 
@@ -37,20 +42,19 @@ Hypervisor configuration and management tools
 ````    
 
 ## Purpose:
-
 This tooling provides a common platform to quickly and seamlessly build virtual environments.
 
 The original inspiration for this project came from endless hours of testing different virtual
 network building tools and strategies in search of a paradigm that meets a number of criteria.
 
-Easy integration of technologies including:
+###### Easy integration of technologies including:
   + Docker
   + LXC / LXD
   + Libvirt / QEMU+KVM
   + Bare Metal Hosts
   + Physical Switching Gear
 
-Easy end-user management and setup:
+###### Easy end-user management and setup:
   + Logical to comprehend
   + Easy to setup
   + Easy to manage
@@ -59,7 +63,7 @@ Easy end-user management and setup:
   + Capable of multi-host overlays
   + Capable of nesting multiple layers of networks
 
-The tooling also needs to be consistent across hardware platforms including:
+###### The tooling also needs to be consistent across hardware platforms including:
   + client laptops
   + client desktops
   + low cost home labs

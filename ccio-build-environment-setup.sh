@@ -471,6 +471,14 @@ elif [[ "$check_OVS_IS_INSTALLED" != "0" ]]; then
     # Install OpenVSwitch
     run_log 0 "installing openvswitch"
     install_openvswitch
+    
+    # Determine host system's service names for OVS
+    ovs_SVC_NAME_CHECK=$(systemctl list-unit-files \
+                        | grep -E "ovs-vswitchd|openvswitch-switch"\
+                        | awk '{print $1}')
+
+    # Update ccio.conf ovs service name
+    sed -i "s/ovs_SERVICE_NAME=\"*\"/ovs_SERVICE_NAME=\"${ovs_SVC_NAME_CHECK}\"/g" /etc/ccio/ccio.conf
 
     run_log 0 "configuring openvswitch"
     configure_openvswitch 
@@ -487,6 +495,14 @@ elif [[ $check_LXD_IS_INSTALLED != "0" ]]; then
     dbg_FLAG="Installing lxd" run_log 0
     check_install_source_lxd 
 
+    # Determine host system's service names for LXD
+    lxd_SVC_NAME_CHECK=$(systemctl list-unit-files \
+                        | grep -E "lxd.service|snap.lxd.daemon.service" \
+                        | awk '{print $1}')
+
+    # Update ccio.conf lxd service name
+    sed -i "s/lxd_SERVICE_NAME=\"*\"/lxd_SERVICE_NAME=\"${lxd_SVC_NAME_CHECK}\"/g" /etc/ccio/ccio.conf
+
     dbg_FLAG="configuring lxd" run_log 0
     configure_lxd_daemon 
 
@@ -495,11 +511,19 @@ fi
 run_log 0 "Is libvirt installed, .... checking"
 if [[ "$check_LIBVIRT_IS_INSTALLED" != "0" ]]; then
 
-        run_log 0 "Checking Host Virtual Extensions"
-        check_host_virt_support
+    run_log 0 "Checking Host Virtual Extensions"
+    check_host_virt_support
 
-        run_log 0 "Configuring libvirt"
-        configure_libvirt 
+
+    # Detect libvirt service name
+    libvirt_SVC_NAME_CHECK=$(systemctl list-unit-files \
+                            | awk '/libvirtd/ {print $1}')
+
+    # Update ccio.conf lxd service name
+    sed -i "s/libvirt_SERVICE_NAME=\"*\"/libvirt_SERVICE_NAME=\"${libvirt_SVC_NAME_CHECK}\"/g" /etc/ccio/ccio.conf
+
+    run_log 0 "Configuring libvirt"
+    configure_libvirt 
 
 fi
 
