@@ -749,10 +749,12 @@ if [ $ovs_BR_IS_REAL = "0" ] && [ $lxd_CONT_IS_REAL = "0" ]; then
     run_log 0 "[f02.5r] >           OVS Bridge:   $name_OVS_BR" 
     run_log 0 "[f02.5r] >           On Port:      $add_OVS_PORT" 
     run_log 0 "[f02.5r] >           HW Address:   $port_IFACE_HWADDR
-     " 
+    " 
 
     # Check if netplan is present in container
-    check_NETPLAN=$(lxc config show $lxd_CONT_NAME | awk -F[\".] '/image.version/ {print $3}')
+    check_NETPLAN=$(lxc config show $lxd_CONT_NAME \
+                   | grep "image.version" \
+                   | awk '{print $2}')
 
     # Halt Container for network device attachment 
     lxd_cont_halt_check
