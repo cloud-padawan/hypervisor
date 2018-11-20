@@ -3,20 +3,20 @@ CCIO Hypervisor installer & OVS BridgeBuilder
 
 Hypervisor configuration and management tools
 
-#### To Install:
+#### To Install: (RUN ALL AS ROOT)
   Install full hypervisor setup and CCIO-Utils
 ````sh   
-    sudo apt install -y curl
+    apt install -y curl
     wget -O install-ccio-setup.sh https://goo.gl/YPSs6k
     source install-ccio-setup.sh
-    sudo ccio-install                                                                                
+    ccio-install                                                                                
 ````    
 
   Add your user to the appropriate groups
 ````sh   
-    sudo usermod -a -G ccio $USER_NAME
-    sudo usermod -a -G lxd $USER_NAME
-    sudo usermod -a -G libvirt $USER_NAME
+    usermod -a -G ccio $USER_NAME
+    usermod -a -G lxd $USER_NAME
+    usermod -a -G libvirt $USER_NAME
 ````    
 
   Then for usage
