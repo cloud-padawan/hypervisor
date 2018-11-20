@@ -121,7 +121,7 @@ LIBVIRT_PKGS="qemu qemu-kvm qemu-utils libvirt0 libvirt-clients libvirt-daemon"
     run_log 0 "Installed LibvirtD + KVM + QEMU Requirements"
 
 libvirt_SVC_NAME_CHECK=$(systemctl list-unit-files | awk '/libvirtd/ {print $1}')
-sed -i "s/libvirt_SERVICE_NAME=*/libvirt_SERVICE_NAME=\"$libvirt_SVC_NAME_CHECK\"/g" /etc/ccio/ccio.conf
+sed -i "s/libvirt_SERVICE_NAME=\"*\"/libvirt_SERVICE_NAME=\"$libvirt_SVC_NAME_CHECK\"/g" /etc/ccio/ccio.conf
 }
 
 #################################################################################
@@ -345,7 +345,7 @@ lxd_SVC_NAME_CHECK=$(systemctl list-unit-files \
                     | grep -E "lxd.service|snap.lxd.daemon.service" \
                     | awk '{print $1}')
 
-sed -i "s/lxd_SERVICE_NAME=*/lxd_SERVICE_NAME=\"$lxd_SVC_NAME_CHECK\""
+sed -i "s/lxd_SERVICE_NAME=\"*\"/lxd_SERVICE_NAME=\"$lxd_SVC_NAME_CHECK\"/g" /etc/ccio/ccio.conf
 }
 
 #################################################################################
@@ -404,10 +404,10 @@ OVS_DPDK_PKGS="dkms dpdk dpdk-dev openvswitch-switch-dpdk"
 
 # Determine host system's service names for OVS
 ovs_SVC_NAME_CHECK=$(systemctl list-unit-files \
-                    | grep -E "ovs-vswitchd.service|openvswitch-switch.service" \
+                    | grep -E "ovs-vswitchd.service|openvswitch-switch.service"\
                     | awk '{print $1}')
 
-sed -i "s/ovs_SERVICE_NAME=*/ovs_SERVICE_NAME=\"$ovs_SVC_NAME_CHECK\"" /etc/ccio/ccio.conf
+sed -i "s/ovs_SERVICE_NAME=\"*\"/ovs_SERVICE_NAME=\"$ovs_SVC_NAME_CHECK\"/g" /etc/ccio/ccio.conf
 }
 
 #################################################################################
@@ -474,7 +474,7 @@ elif [[ "$check_OVS_IS_INSTALLED" != "0" ]]; then
     
     # Determine host system's service names for OVS
     ovs_SVC_NAME_CHECK=$(systemctl list-unit-files \
-                        | grep -E "ovs-vswitchd|openvswitch-switch"\
+                        | grep -E "ovs-vswitchd.service|openvswitch-switch.service"\
                         | awk '{print $1}')
 
     # Update ccio.conf ovs service name
