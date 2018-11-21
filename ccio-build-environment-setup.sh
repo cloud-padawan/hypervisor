@@ -198,7 +198,7 @@ if [ "$(zpool list $zpool_NAME; echo $?)" = "0" ]; then
         #lxc storage list | grep $zpool_NAME
         echo ""
         while true; do
-        read -rp "Are you sure $zpool_NAME is safe to erase?" yn
+        read -rp "Are you sure $zpool_NAME is safe to erase? " yn
             case $yn in
                 [Yy]* ) run_log 0 "Purging $zpool_NAME ...." 
                         break
