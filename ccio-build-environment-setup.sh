@@ -154,7 +154,6 @@ run_log 0 "Checking Host System Virtual Extensions"
 if [ "$check_HOST_VIRT_EXT" != "0" ]; then
 
 	    run_log 0 "System passed host virtual extension support check"
-        install_libvirt
 
 elif [ "$check_HOST_VIRT_EXT" != "0" ]; then
 
@@ -514,6 +513,8 @@ if [[ "$check_LIBVIRT_IS_INSTALLED" != "0" ]]; then
     run_log 0 "Checking Host Virtual Extensions"
     check_host_virt_support
 
+    # Install Libvirtd
+    install_libvirt
 
     # Detect libvirt service name
     libvirt_SVC_NAME_CHECK=$(systemctl list-unit-files \

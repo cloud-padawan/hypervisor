@@ -63,7 +63,7 @@ fi
 
 # Determine host system's service names for OVS
 ovs_SVC_NAME_CHECK=$(systemctl list-unit-files \
-                    | grep -E "ovs-vswitchd.service|openvswitch-switch.service" \
+                    | grep -E "openvswitch-switch.service" \
                     | awk '{print $1}')
 
 # Check if SVC Name Valid
